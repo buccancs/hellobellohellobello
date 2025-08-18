@@ -8,6 +8,17 @@ The format is based on Keep a Changelog and this project adheres to Conventional
 
 ### Added
 
+- **Comprehensive Visualization Enhancements**: Complete overhaul of PC Controller visualization system
+  - **Thermal Camera Visualization**: New DeviceWidget type "thermal" with false-color heatmap display, temperature overlays, and ROI support
+  - **Multi-Channel Sensor Plotting**: Enhanced GSR widget supporting simultaneous GSR + PPG display with automatic scaling
+  - **Enhanced Timeline & Annotations**: Visual annotation markers on plots, highlighted current position, improved timeline navigation
+  - **Real-Time Status Dashboard**: StatusWidget showing recording state, device connections, network status, and live data counters
+  - **Advanced Data Analysis Suite**: Enhanced analysis script with correlation plots, spectral analysis, event detection, and distribution analysis
+  - Thermal colormap implementation (blue→cyan→green→yellow→red mapping)
+  - Rolling data buffers with configurable time windows for real-time plotting
+  - Backward compatibility maintained with existing single-channel interfaces
+  - Comprehensive test suite with 5 test cases covering all visualization components
+
 - **Enhanced TLS Security (NFR5)**: Complete enterprise-grade TLS implementation with comprehensive configuration management
   - TLSConfig class with environment-based configuration support
   - SecureConnectionManager for TLS connection handling and SSL context creation
