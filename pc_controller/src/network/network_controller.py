@@ -27,7 +27,7 @@ from data.data_aggregator import get_local_ip
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from zeroconf import IPVersion, ServiceBrowser, Zeroconf
 
-from ..config import get as cfg_get
+from config import get as cfg_get
 from .file_transfer_server import FileTransferServer
 from .protocol import (
     build_v1_cmd,
