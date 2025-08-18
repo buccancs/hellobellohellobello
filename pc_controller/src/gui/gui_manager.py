@@ -81,6 +81,17 @@ class DeviceWidget(QWidget):
             self.view.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.view.setMinimumSize(320, 180)
             layout.addWidget(self.view)
+        elif kind == "thermal":
+            # Thermal camera visualization - similar to video but with temperature colormap
+            self.view = QLabel(self)
+            self.view.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.view.setMinimumSize(320, 240)  # Slightly taller for thermal resolution
+            layout.addWidget(self.view)
+            # Add temperature range indicator
+            self.temp_range_label = QLabel("Temp Range: --°C to --°C", self)
+            self.temp_range_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.temp_range_label.setStyleSheet("color: orange; font-size: 10px;")
+            layout.addWidget(self.temp_range_label)
         elif kind == "gsr":
             if pg is None:
                 lbl = QLabel("PyQtGraph not available", self)
@@ -91,14 +102,75 @@ class DeviceWidget(QWidget):
                 self.view = pg.PlotWidget(self)
                 self.view.setBackground("w")
                 self.curve = self.view.plot(pen=pg.mkPen(color=(0, 120, 255), width=2))
+                # Add axis labels and grid for better visualization
+                self.view.setLabel('left', 'GSR (μS)', color='black', size='10pt')
+                self.view.setLabel('bottom', 'Time (seconds)', color='black', size='10pt')
+                self.view.showGrid(True, True, alpha=0.3)
+                # Add data quality indicator
+                self.quality_label = QLabel("Quality: --", self)
+                self.quality_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.quality_label.setStyleSheet("color: green; font-size: 10px;")
                 layout.addWidget(self.view)
+                layout.addWidget(self.quality_label)
             # Data buffer for plotting: last 10 seconds at 128 Hz
             self._buf_seconds = 10.0
             self._buf_max = int(128 * self._buf_seconds)
             self._times: deque[float] = deque(maxlen=self._buf_max)
             self._values: deque[float] = deque(maxlen=self._buf_max)
+            self._sample_count = 0
         else:
             raise ValueError(f"Unsupported DeviceWidget kind: {kind}")
+
+    def update_thermal_frame(self, thermal_data: np.ndarray, temp_min: float = None, temp_max: float = None) -> None:
+        """Update thermal camera display with false-color temperature visualization."""
+        if self.kind != "thermal":
+            return
+        if thermal_data is None:
+            return
+        
+        try:
+            import cv2
+            # Apply false-color mapping for thermal data
+            # Normalize thermal data to 0-255 range
+            if thermal_data.min() == thermal_data.max():
+                # Avoid division by zero
+                normalized = np.zeros_like(thermal_data, dtype=np.uint8)
+            else:
+                normalized = ((thermal_data - thermal_data.min()) / 
+                            (thermal_data.max() - thermal_data.min()) * 255).astype(np.uint8)
+            
+            # Apply colormap (COLORMAP_JET gives blue-to-red temperature visualization)
+            colored_thermal = cv2.applyColorMap(normalized, cv2.COLORMAP_JET)
+            
+            # Convert BGR to RGB for Qt
+            thermal_rgb = colored_thermal[:, :, ::-1]
+            h, w, ch = thermal_rgb.shape
+            bytes_per_line = ch * w
+            qimg = QImage(thermal_rgb.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            
+            self.view.setPixmap(QPixmap.fromImage(qimg).scaled(
+                self.view.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            ))
+            
+            # Update temperature range display
+            if temp_min is not None and temp_max is not None:
+                self.temp_range_label.setText(f"Temp Range: {temp_min:.1f}°C to {temp_max:.1f}°C")
+            else:
+                # Use data min/max if actual temps not provided
+                data_min, data_max = thermal_data.min(), thermal_data.max()
+                self.temp_range_label.setText(f"Temp Range: {data_min:.1f} to {data_max:.1f}")
+                
+        except Exception:
+            # Fallback to grayscale if OpenCV not available
+            if thermal_data.ndim == 2:
+                # Convert single channel to RGB
+                normalized = ((thermal_data - thermal_data.min()) / 
+                            (thermal_data.max() - thermal_data.min()) * 255).astype(np.uint8)
+                h, w = normalized.shape
+                qimg = QImage(normalized.data, w, h, w, QImage.Format.Format_Grayscale8)
+                self.view.setPixmap(QPixmap.fromImage(qimg).scaled(
+                    self.view.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+                ))
 
     def update_video_frame(self, frame_bgr: np.ndarray) -> None:
         if self.kind != "video":
@@ -131,11 +203,40 @@ class DeviceWidget(QWidget):
             return
         self._times.extend(ts.tolist())
         self._values.extend(vals.tolist())
+        self._sample_count += ts.size
+        
         # Update plot immediately; X axis as relative seconds
         t0 = self._times[0] if self._times else time.monotonic()
         x = np.fromiter((t - t0 for t in self._times), dtype=np.float64, count=len(self._times))
         y = np.fromiter(self._values, dtype=np.float64, count=len(self._values))
         self.curve.setData(x, y)
+        
+        # Update data quality indicator based on sampling rate and signal stability
+        if hasattr(self, 'quality_label') and self._sample_count > 10:
+            # Calculate approximate sampling rate
+            if len(self._times) > 1:
+                time_span = self._times[-1] - self._times[0]
+                if time_span > 0:
+                    sample_rate = len(self._times) / time_span
+                    # Check signal quality based on sampling rate and variance
+                    signal_variance = np.var(y[-min(128, len(y)):])  # Last second of data
+                    
+                    if sample_rate > 120:  # Expected ~128 Hz
+                        if signal_variance < 0.01:  # Very stable signal might be disconnected
+                            quality = "Poor (No signal?)"
+                            color = "red"
+                        elif signal_variance > 10.0:  # Very noisy signal
+                            quality = "Fair (Noisy)"
+                            color = "orange"
+                        else:
+                            quality = "Good"
+                            color = "green"
+                    else:
+                        quality = f"Poor ({sample_rate:.0f} Hz)"
+                        color = "red"
+                        
+                    self.quality_label.setText(f"Quality: {quality}")
+                    self.quality_label.setStyleSheet(f"color: {color}; font-size: 10px;")
 
 
 class GUIManager(QMainWindow):
@@ -217,6 +318,9 @@ class GUIManager(QMainWindow):
         self.playback_layout.addLayout(ann_row)
         self.ann_list = QListWidget(self.playback)
         self.playback_layout.addWidget(self.ann_list)
+        
+        # Storage for annotation markers on the plot
+        self._annotation_markers = []
         self.tabs.addTab(self.playback, "Playback & Annotation")
 
         # Wire buttons
@@ -258,8 +362,10 @@ class GUIManager(QMainWindow):
         # Local device widgets and interfaces
         self.webcam_widget = DeviceWidget("video", "Local Webcam", self)
         self.gsr_widget = DeviceWidget("gsr", "Shimmer GSR (Local)", self)
+        self.thermal_widget = DeviceWidget("thermal", "Thermal Camera", self)
         self._add_to_grid(self.webcam_widget)
         self._add_to_grid(self.gsr_widget)
+        self._add_to_grid(self.thermal_widget)
 
         # Interfaces (optional shims)
         self.webcam = WebcamInterface() if WebcamInterface else None
@@ -793,11 +899,60 @@ class GUIManager(QMainWindow):
         self.ann_list.addItem(f"{entry['ts_ms']} ms - {entry['text']}")
         self.ann_input.clear()
         self._save_annotations()
+        # Add visual marker to the plot
+        self._add_annotation_marker(entry)
+
+    def _add_annotation_marker(self, entry: dict) -> None:
+        """Add a visual marker for an annotation on the plot."""
+        if pg is None or self.plot is None:
+            return
+        try:
+            # Convert timestamp to x-axis coordinate (seconds)
+            x_pos = entry['ts_ms'] / 1000.0
+            
+            # Create a vertical line marker
+            marker_line = pg.InfiniteLine(
+                pos=x_pos,
+                angle=90,
+                pen=pg.mkPen(color=(255, 165, 0), width=2, style=pg.QtCore.Qt.PenStyle.DashLine),
+                movable=False
+            )
+            
+            # Add text label
+            text_item = pg.TextItem(
+                text=entry['text'][:20] + ('...' if len(entry['text']) > 20 else ''),
+                color=(255, 165, 0),
+                anchor=(0, 1)  # Top-left anchor
+            )
+            text_item.setPos(x_pos, self.plot.viewRange()[1][1])  # Position at top of plot
+            
+            # Store references to remove later if needed
+            self._annotation_markers.append((marker_line, text_item))
+            
+            # Add to plot
+            self.plot.addItem(marker_line)
+            self.plot.addItem(text_item)
+            
+        except Exception as exc:
+            self._log(f"Error adding annotation marker: {exc}")
+
+    def _clear_annotation_markers(self) -> None:
+        """Clear all annotation markers from the plot."""
+        if pg is None or self.plot is None:
+            return
+        try:
+            for marker_line, text_item in self._annotation_markers:
+                self.plot.removeItem(marker_line)
+                self.plot.removeItem(text_item)
+            self._annotation_markers.clear()
+        except Exception as exc:
+            self._log(f"Error clearing annotation markers: {exc}")
 
     def _load_annotations(self) -> None:
         import json
         self._annotations = []
         self.ann_list.clear()
+        self._clear_annotation_markers()  # Clear existing markers first
         if not self._loaded_session_dir:
             return
         path = os.path.join(self._loaded_session_dir, "annotations.json")
@@ -809,6 +964,8 @@ class GUIManager(QMainWindow):
                         self._annotations = data
                         for e in data:
                             self.ann_list.addItem(f"{int(e.get('ts_ms', 0))} ms - {e.get('text', '')}")
+                            # Add visual marker for each loaded annotation
+                            self._add_annotation_marker(e)
             except Exception:
                 pass
 
