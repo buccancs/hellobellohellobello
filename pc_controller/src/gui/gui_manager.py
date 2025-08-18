@@ -58,12 +58,80 @@ class _GridPos:
     col: int
 
 
+class StatusWidget(QWidget):
+    """Widget to display system status including device connections and recording state."""
+    
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(300, 150)
+        layout = QVBoxLayout(self)
+        
+        # Header
+        header = QLabel("System Status", self)
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.setStyleSheet("font-weight: bold; font-size: 12px;")
+        layout.addWidget(header)
+        
+        # Recording status
+        self.recording_status = QLabel("●", self)
+        self.recording_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.recording_status.setStyleSheet("color: red; font-size: 20px;")
+        self.recording_label = QLabel("Not Recording", self)
+        self.recording_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        recording_layout = QHBoxLayout()
+        recording_layout.addWidget(self.recording_status)
+        recording_layout.addWidget(self.recording_label)
+        layout.addLayout(recording_layout)
+        
+        # Device connections
+        self.device_status = QLabel("Devices: Local only", self)
+        self.device_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.device_status)
+        
+        # Network status
+        self.network_status = QLabel("Network: Discovering...", self)
+        self.network_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.network_status)
+        
+        # Data stats
+        self.data_stats = QLabel("Data: 0 samples", self)
+        self.data_stats.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.data_stats)
+    
+    def update_recording_status(self, recording: bool) -> None:
+        """Update recording status display."""
+        if recording:
+            self.recording_status.setStyleSheet("color: green; font-size: 20px;")
+            self.recording_label.setText("Recording")
+        else:
+            self.recording_status.setStyleSheet("color: red; font-size: 20px;")
+            self.recording_label.setText("Not Recording")
+    
+    def update_device_count(self, local_count: int, remote_count: int) -> None:
+        """Update device connection count."""
+        total = local_count + remote_count
+        self.device_status.setText(f"Devices: {total} ({local_count} local, {remote_count} remote)")
+    
+    def update_network_status(self, status: str) -> None:
+        """Update network status."""
+        self.network_status.setText(f"Network: {status}")
+    
+    def update_data_stats(self, sample_count: int) -> None:
+        """Update data statistics."""
+        if sample_count > 1000:
+            self.data_stats.setText(f"Data: {sample_count/1000:.1f}k samples")
+        else:
+            self.data_stats.setText(f"Data: {sample_count} samples")
+
+
 class DeviceWidget(QWidget):
     """Reusable widget for a single data source.
 
-    Two modes:
-    - video: displays frames in a QLabel
+    Three modes:
+    - video: displays RGB/regular video frames in a QLabel
     - gsr: displays a scrolling waveform using PyQtGraph
+    - thermal: displays thermal camera data as false-color heatmap
     """
 
     def __init__(self, kind: str, title: str, parent: QWidget | None = None) -> None:
@@ -81,6 +149,21 @@ class DeviceWidget(QWidget):
             self.view.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.view.setMinimumSize(320, 180)
             layout.addWidget(self.view)
+        elif kind == "thermal":
+            # Thermal camera visualization with false-color heatmap
+            self.view = QLabel(self)
+            self.view.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.view.setMinimumSize(256, 192)  # Typical thermal camera resolution
+            layout.addWidget(self.view)
+            # Temperature info overlay
+            self.temp_info = QLabel("Temp: --°C (Min: --°C, Max: --°C)", self)
+            self.temp_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(self.temp_info)
+            # ROI selection state
+            self._thermal_roi: tuple[int, int, int, int] | None = None
+            self._thermal_data: np.ndarray | None = None
+            self._thermal_width: int = 256
+            self._thermal_height: int = 192
         elif kind == "gsr":
             if pg is None:
                 lbl = QLabel("PyQtGraph not available", self)
@@ -90,13 +173,21 @@ class DeviceWidget(QWidget):
             else:
                 self.view = pg.PlotWidget(self)
                 self.view.setBackground("w")
-                self.curve = self.view.plot(pen=pg.mkPen(color=(0, 120, 255), width=2))
+                self.view.setLabel('left', 'GSR (μS)')
+                self.view.setLabel('bottom', 'Time (s)')
+                # Multiple curves for multi-channel data (GSR + PPG)
+                self.gsr_curve = self.view.plot(pen=pg.mkPen(color=(0, 120, 255), width=2), name="GSR")
+                self.ppg_curve = self.view.plot(pen=pg.mkPen(color=(255, 120, 0), width=1), name="PPG")
+                # Add legend
+                self.view.addLegend()
                 layout.addWidget(self.view)
-            # Data buffer for plotting: last 10 seconds at 128 Hz
+            # Data buffers for plotting: last 10 seconds at 128 Hz
             self._buf_seconds = 10.0
             self._buf_max = int(128 * self._buf_seconds)
-            self._times: deque[float] = deque(maxlen=self._buf_max)
-            self._values: deque[float] = deque(maxlen=self._buf_max)
+            self._gsr_times: deque[float] = deque(maxlen=self._buf_max)
+            self._gsr_values: deque[float] = deque(maxlen=self._buf_max)
+            self._ppg_times: deque[float] = deque(maxlen=self._buf_max)
+            self._ppg_values: deque[float] = deque(maxlen=self._buf_max)
         else:
             raise ValueError(f"Unsupported DeviceWidget kind: {kind}")
 
@@ -124,7 +215,152 @@ class DeviceWidget(QWidget):
             self.view.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
         ))
 
-    def append_gsr_samples(self, ts: np.ndarray, vals: np.ndarray) -> None:
+    def update_thermal_data(self, thermal_data: np.ndarray, width: int, height: int) -> None:
+        """Update thermal visualization with new thermal frame data."""
+        if self.kind != "thermal":
+            return
+        if thermal_data is None or len(thermal_data) == 0:
+            return
+        
+        try:
+            # Store thermal data for ROI calculations
+            self._thermal_data = thermal_data.copy()
+            self._thermal_width = width
+            self._thermal_height = height
+            
+            # Reshape data to image format
+            if len(thermal_data.shape) == 1:
+                thermal_image = thermal_data.reshape((height, width))
+            else:
+                thermal_image = thermal_data
+            
+            # Apply false-color mapping (simple grayscale to RGB for now)
+            # Normalize to 0-255 range
+            min_val = thermal_image.min()
+            max_val = thermal_image.max()
+            if max_val > min_val:
+                normalized = ((thermal_image - min_val) / (max_val - min_val) * 255).astype(np.uint8)
+            else:
+                normalized = np.zeros_like(thermal_image, dtype=np.uint8)
+            
+            # Apply a simple thermal colormap (blue->green->yellow->red)
+            thermal_rgb = self._apply_thermal_colormap(normalized)
+            
+            # Convert to QImage
+            h, w, ch = thermal_rgb.shape
+            bytes_per_line = ch * w
+            qimg = QImage(thermal_rgb.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            
+            # Display in QLabel
+            self.view.setPixmap(QPixmap.fromImage(qimg).scaled(
+                self.view.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            ))
+            
+            # Update temperature info
+            self._update_temperature_info(thermal_image, min_val, max_val)
+            
+        except Exception as exc:
+            print(f"Thermal update error: {exc}")
+    
+    def _apply_thermal_colormap(self, normalized: np.ndarray) -> np.ndarray:
+        """Apply thermal false-color mapping to normalized data."""
+        h, w = normalized.shape
+        rgb = np.zeros((h, w, 3), dtype=np.uint8)
+        
+        # Simple thermal colormap: blue->cyan->green->yellow->red
+        for i in range(h):
+            for j in range(w):
+                val = normalized[i, j] / 255.0  # 0.0 to 1.0
+                if val < 0.25:
+                    # Blue to cyan
+                    t = val / 0.25
+                    rgb[i, j] = [0, int(255 * t), 255]
+                elif val < 0.5:
+                    # Cyan to green
+                    t = (val - 0.25) / 0.25
+                    rgb[i, j] = [0, 255, int(255 * (1 - t))]
+                elif val < 0.75:
+                    # Green to yellow
+                    t = (val - 0.5) / 0.25
+                    rgb[i, j] = [int(255 * t), 255, 0]
+                else:
+                    # Yellow to red
+                    t = (val - 0.75) / 0.25
+                    rgb[i, j] = [255, int(255 * (1 - t)), 0]
+        
+        return rgb
+    
+    def _update_temperature_info(self, thermal_image: np.ndarray, min_temp: float, max_temp: float) -> None:
+        """Update temperature information display."""
+        if self.kind != "thermal" or not hasattr(self, 'temp_info'):
+            return
+        
+        # Calculate ROI temperature if ROI is set
+        if self._thermal_roi is not None:
+            roi_temp = self._calculate_roi_temperature(thermal_image)
+            temp_text = f"ROI: {roi_temp:.1f}°C (Min: {min_temp:.1f}°C, Max: {max_temp:.1f}°C)"
+        else:
+            mean_temp = thermal_image.mean()
+            temp_text = f"Mean: {mean_temp:.1f}°C (Min: {min_temp:.1f}°C, Max: {max_temp:.1f}°C)"
+        
+        self.temp_info.setText(temp_text)
+    
+    def _calculate_roi_temperature(self, thermal_image: np.ndarray) -> float:
+        """Calculate mean temperature within ROI."""
+        if self._thermal_roi is None:
+            return thermal_image.mean()
+        
+        x, y, w, h = self._thermal_roi
+        roi_data = thermal_image[y:y+h, x:x+w]
+        return roi_data.mean() if roi_data.size > 0 else thermal_image.mean()
+    
+    def set_thermal_roi(self, x: int, y: int, width: int, height: int) -> None:
+        """Set region of interest for thermal analysis."""
+        if self.kind == "thermal":
+            self._thermal_roi = (x, y, width, height)
+    
+    def append_gsr_samples(self, ts: np.ndarray, gsr_vals: np.ndarray, ppg_vals: np.ndarray | None = None) -> None:
+        """Update GSR (and optionally PPG) visualization with new samples."""
+        if self.kind != "gsr" or pg is None or self.view is None:
+            return
+        if ts.size == 0:
+            return
+        
+        # Update GSR data
+        self._gsr_times.extend(ts.tolist())
+        self._gsr_values.extend(gsr_vals.tolist())
+        
+        # Update GSR plot
+        t0_gsr = self._gsr_times[0] if self._gsr_times else time.monotonic()
+        x_gsr = np.fromiter((t - t0_gsr for t in self._gsr_times), dtype=np.float64, count=len(self._gsr_times))
+        y_gsr = np.fromiter(self._gsr_values, dtype=np.float64, count=len(self._gsr_values))
+        self.gsr_curve.setData(x_gsr, y_gsr)
+        
+        # Update PPG data if provided
+        if ppg_vals is not None and len(ppg_vals) == len(ts):
+            self._ppg_times.extend(ts.tolist())
+            self._ppg_values.extend(ppg_vals.tolist())
+            
+            # Update PPG plot (scaled to be visible with GSR)
+            t0_ppg = self._ppg_times[0] if self._ppg_times else time.monotonic()
+            x_ppg = np.fromiter((t - t0_ppg for t in self._ppg_times), dtype=np.float64, count=len(self._ppg_times))
+            y_ppg = np.fromiter(self._ppg_values, dtype=np.float64, count=len(self._ppg_values))
+            
+            # Scale PPG values to be visible alongside GSR (normalize to GSR range)
+            if len(y_gsr) > 0 and len(y_ppg) > 0:
+                gsr_range = y_gsr.max() - y_gsr.min() if len(y_gsr) > 1 else 1.0
+                ppg_range = y_ppg.max() - y_ppg.min() if len(y_ppg) > 1 else 1.0
+                if ppg_range > 0:
+                    # Scale PPG to 20% of GSR range and offset
+                    ppg_scaled = (y_ppg - y_ppg.min()) / ppg_range * (gsr_range * 0.2)
+                    if len(y_gsr) > 0:
+                        ppg_scaled += y_gsr.max() + gsr_range * 0.1  # Offset above GSR
+                    self.ppg_curve.setData(x_ppg, ppg_scaled)
+    
+    # Legacy single-channel method for backward compatibility
+    def append_gsr_samples_legacy(self, ts: np.ndarray, vals: np.ndarray) -> None:
+        """Legacy method for single-channel GSR data."""
+        self.append_gsr_samples(ts, vals, None)
         if self.kind != "gsr" or pg is None or self.view is None:
             return
         if ts.size == 0:
@@ -258,8 +494,12 @@ class GUIManager(QMainWindow):
         # Local device widgets and interfaces
         self.webcam_widget = DeviceWidget("video", "Local Webcam", self)
         self.gsr_widget = DeviceWidget("gsr", "Shimmer GSR (Local)", self)
+        self.thermal_widget = DeviceWidget("thermal", "Thermal Camera", self)
+        self.status_widget = StatusWidget(self)
         self._add_to_grid(self.webcam_widget)
         self._add_to_grid(self.gsr_widget)
+        self._add_to_grid(self.thermal_widget)
+        self._add_to_grid(self.status_widget)
 
         # Interfaces (optional shims)
         self.webcam = WebcamInterface() if WebcamInterface else None
@@ -289,6 +529,10 @@ class GUIManager(QMainWindow):
         self.gsr_timer = QTimer(self)
         self.gsr_timer.setInterval(50)  # 20 Hz UI updates, data @128 Hz aggregated
         self.gsr_timer.timeout.connect(self._on_gsr_timer)
+
+        self.thermal_timer = QTimer(self)
+        self.thermal_timer.setInterval(100)  # 10 Hz updates for thermal data
+        self.thermal_timer.timeout.connect(self._on_thermal_timer)
 
         # Periodic time re-sync timer (every 3 minutes)
         self._resync_timer = QTimer(self)
@@ -339,12 +583,17 @@ class GUIManager(QMainWindow):
 
         self.video_timer.start()
         self.gsr_timer.start()
+        self.thermal_timer.start()
 
         # Recording state
         self._recording = False
         self._video_writer = None
         self._gsr_file = None
         self._gsr_written_header = False
+        
+        # Enable thermal simulation for visualization testing
+        self._thermal_simulation = True
+        self._sample_count = 0  # Track data samples for status
 
     # Toolbar setup
     def _setup_toolbar(self) -> None:
@@ -395,6 +644,7 @@ class GUIManager(QMainWindow):
             pass
         self._open_recorders(self._session_dir)
         self._recording = True
+        self.status_widget.update_recording_status(True)
         self._log(f"Session started: {self._session_dir}")
 
     def _on_stop_session(self) -> None:
@@ -413,6 +663,7 @@ class GUIManager(QMainWindow):
         # Close local recorders
         self._close_recorders()
         self._recording = False
+        self.status_widget.update_recording_status(False)
         self._log("Session stopped.")
         # Write session metadata with clock offsets for validation
         try:
@@ -474,10 +725,27 @@ class GUIManager(QMainWindow):
             widget = DeviceWidget("video", f"Remote: {device.name}", self)
             self._remote_widgets[device.name] = widget
             self._add_to_grid(widget)
+        
+        # Update status
+        self._update_device_status()
 
     @pyqtSlot(str)
     def _on_device_removed(self, name: str) -> None:
         self._log(f"Removed: {name}")
+        # Update status
+        self._update_device_status()
+    
+    def _update_device_status(self) -> None:
+        """Update device connection status display."""
+        local_devices = 3  # webcam, gsr, thermal
+        remote_devices = len(self._remote_widgets)
+        self.status_widget.update_device_count(local_devices, remote_devices)
+        
+        # Update network status
+        if remote_devices > 0:
+            self.status_widget.update_network_status(f"Connected to {remote_devices} devices")
+        else:
+            self.status_widget.update_network_status("Discovering devices...")
 
     @pyqtSlot(str, object, int)
     def _on_preview_frame(self, device_name: str, jpeg_bytes: object, ts_ns: int) -> None:
@@ -563,13 +831,59 @@ class GUIManager(QMainWindow):
         try:
             if not self.shimmer:
                 return
-            ts, vals = self.shimmer.get_latest_samples()
-            if ts.size:
-                self.gsr_widget.append_gsr_samples(ts, vals)
-                if self._recording:
-                    self._write_gsr_samples(ts, vals)
+            # Get multi-channel samples (GSR + PPG if available)
+            samples = self.shimmer.get_latest_samples()
+            if hasattr(samples, '__len__') and len(samples) >= 2:
+                # Multi-channel format: [(timestamp, gsr_val, ppg_val), ...]
+                if samples and len(samples[0]) >= 3:
+                    ts = np.array([s[0] for s in samples])
+                    gsr_vals = np.array([s[1] for s in samples])
+                    ppg_vals = np.array([s[2] for s in samples])
+                    if ts.size:
+                        self.gsr_widget.append_gsr_samples(ts, gsr_vals, ppg_vals)
+                        self._sample_count += ts.size
+                        self.status_widget.update_data_stats(self._sample_count)
+                        if self._recording:
+                            self._write_gsr_samples_multichannel(ts, gsr_vals, ppg_vals)
+                else:
+                    # Legacy single-channel format: [(timestamp, gsr_val), ...]
+                    ts = np.array([s[0] for s in samples])
+                    gsr_vals = np.array([s[1] for s in samples])
+                    if ts.size:
+                        self.gsr_widget.append_gsr_samples(ts, gsr_vals, None)
+                        self._sample_count += ts.size
+                        self.status_widget.update_data_stats(self._sample_count)
+                        if self._recording:
+                            self._write_gsr_samples(ts, gsr_vals)
+            else:
+                # Legacy interface compatibility
+                ts, vals = samples if isinstance(samples, tuple) else (np.array([]), np.array([]))
+                if ts.size:
+                    self.gsr_widget.append_gsr_samples(ts, vals, None)
+                    self._sample_count += ts.size
+                    self.status_widget.update_data_stats(self._sample_count)
+                    if self._recording:
+                        self._write_gsr_samples(ts, vals)
         except Exception as exc:  # noqa: BLE001
             self._log(f"GSR update error: {exc}")
+
+    def _on_thermal_timer(self) -> None:
+        """Handle thermal camera data updates."""
+        try:
+            # TODO: Add thermal interface when available
+            # For now, simulate thermal data for visualization testing
+            if hasattr(self, '_thermal_simulation') and self._thermal_simulation:
+                import time
+                # Generate synthetic thermal data for testing
+                width, height = 256, 192
+                t = time.time() * 0.1
+                thermal_data = np.random.randn(height, width) * 2 + 25 + 5 * np.sin(t)
+                self.thermal_widget.update_thermal_data(thermal_data, width, height)
+                # Count thermal frames as samples
+                self._sample_count += 1
+                self.status_widget.update_data_stats(self._sample_count)
+        except Exception as exc:  # noqa: BLE001
+            self._log(f"Thermal update error: {exc}")
 
     # Recording helpers
     def _ensure_data_dir(self) -> None:
@@ -620,6 +934,14 @@ class GUIManager(QMainWindow):
         for t, v in zip(ts, vals, strict=False):
             # PC-local does not have PPG; write empty placeholder for schema consistency
             self._gsr_file.write(f"{int(t*1e9)},{v:.6f},\n")
+        self._gsr_file.flush()
+
+    def _write_gsr_samples_multichannel(self, ts: np.ndarray, gsr_vals: np.ndarray, ppg_vals: np.ndarray) -> None:
+        """Write multi-channel GSR+PPG data to CSV."""
+        if not self._gsr_file:
+            return
+        for t, g, p in zip(ts, gsr_vals, ppg_vals, strict=False):
+            self._gsr_file.write(f"{int(t*1e9)},{g:.6f},{p:.2f}\n")
         self._gsr_file.flush()
 
     def _write_video_frame(self, frame_bgr: np.ndarray) -> None:
@@ -780,9 +1102,31 @@ class GUIManager(QMainWindow):
         if pg is None or self.plot is None or self.cursor is None:
             return
         try:
-            self.cursor.setPos(float(self._current_ms) / 1000.0)
+            current_time_s = float(self._current_ms) / 1000.0
+            self.cursor.setPos(current_time_s)
+            
+            # Update annotation markers visibility
+            self._update_annotation_markers(current_time_s)
         except Exception:
             pass
+    
+    def _update_annotation_markers(self, current_time_s: float) -> None:
+        """Update visibility and highlight of annotation markers."""
+        if not hasattr(self, '_annotation_markers'):
+            return
+        
+        # Highlight nearby annotations
+        highlight_window = 2.0  # seconds
+        for marker, ann in zip(self._annotation_markers, self._annotations, strict=False):
+            ann_time_s = ann.get('ts_ms', 0) / 1000.0
+            distance = abs(current_time_s - ann_time_s)
+            
+            if distance <= highlight_window:
+                # Highlight nearby annotation
+                marker.setPen(pg.mkPen(color=(255, 255, 0), width=3))  # Yellow highlight
+            else:
+                # Normal annotation color
+                marker.setPen(pg.mkPen(color=(0, 255, 0), width=2))  # Green normal
 
     def _on_add_annotation(self) -> None:
         text = self.ann_input.text().strip()
@@ -793,11 +1137,55 @@ class GUIManager(QMainWindow):
         self.ann_list.addItem(f"{entry['ts_ms']} ms - {entry['text']}")
         self.ann_input.clear()
         self._save_annotations()
+        # Add visual marker to plot
+        self._add_annotation_marker(entry)
+    
+    def _add_annotation_marker(self, annotation: dict) -> None:
+        """Add visual marker for annotation on the plot."""
+        if pg is None or self.plot is None:
+            return
+        
+        if not hasattr(self, '_annotation_markers'):
+            self._annotation_markers = []
+        
+        try:
+            time_s = annotation.get('ts_ms', 0) / 1000.0
+            marker = pg.InfiniteLine(pos=time_s, angle=90, movable=False,
+                                   pen=pg.mkPen(color=(0, 255, 0), width=2, style=Qt.PenStyle.DashLine))
+            self.plot.addItem(marker)
+            self._annotation_markers.append(marker)
+            
+            # Add text label
+            text_item = pg.TextItem(text=annotation.get('text', ''), 
+                                  color=(0, 150, 0), anchor=(0, 1))
+            text_item.setPos(time_s, 0)
+            self.plot.addItem(text_item)
+            
+        except Exception as exc:
+            print(f"Failed to add annotation marker: {exc}")
+    
+    def _clear_annotation_markers(self) -> None:
+        """Clear all annotation markers from the plot."""
+        if not hasattr(self, '_annotation_markers'):
+            self._annotation_markers = []
+            return
+        
+        if pg is None or self.plot is None:
+            return
+        
+        for marker in self._annotation_markers:
+            try:
+                self.plot.removeItem(marker)
+            except Exception:
+                pass
+        self._annotation_markers.clear()
 
     def _load_annotations(self) -> None:
         import json
         self._annotations = []
         self.ann_list.clear()
+        self._clear_annotation_markers()  # Clear existing markers
+        
         if not self._loaded_session_dir:
             return
         path = os.path.join(self._loaded_session_dir, "annotations.json")
@@ -809,6 +1197,8 @@ class GUIManager(QMainWindow):
                         self._annotations = data
                         for e in data:
                             self.ann_list.addItem(f"{int(e.get('ts_ms', 0))} ms - {e.get('text', '')}")
+                            # Add visual marker for each annotation
+                            self._add_annotation_marker(e)
             except Exception:
                 pass
 
