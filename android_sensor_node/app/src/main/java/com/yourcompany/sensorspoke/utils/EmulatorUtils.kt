@@ -17,12 +17,16 @@ object EmulatorUtils {
     fun isRunningOnEmulator(): Boolean {
         return (Build.FINGERPRINT.startsWith("generic") ||
                 Build.FINGERPRINT.startsWith("unknown") ||
+                Build.FINGERPRINT.contains("test-keys") ||  // Robolectric and some emulators
                 Build.MODEL.contains("google_sdk") ||
                 Build.MODEL.contains("Emulator") ||
                 Build.MODEL.contains("Android SDK built for x86") ||
+                Build.MODEL.contains("sdk_gphone") ||  // New Android emulator
                 Build.MANUFACTURER.contains("Genymotion") ||
+                Build.MANUFACTURER.contains("unknown") ||  // Robolectric
                 Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic") ||
-                "google_sdk" == Build.PRODUCT)
+                "google_sdk" == Build.PRODUCT ||
+                "robolectric" == Build.PRODUCT)  // Explicit Robolectric check
     }
     
     /**

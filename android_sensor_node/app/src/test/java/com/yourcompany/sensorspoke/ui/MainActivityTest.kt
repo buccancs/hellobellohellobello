@@ -10,7 +10,6 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 
-@Ignore("UI smoke test placeholder; Robolectric availability varies in CI; will be enabled with proper shadows/instrumentation.")
 @RunWith(RobolectricTestRunner::class)
 class MainActivityTest {
     @Test
@@ -32,5 +31,20 @@ class MainActivityTest {
         assertThat(stopBtn).isInstanceOf(Button::class.java)
         assertThat((startBtn as Button).text.toString()).contains("Start Recording")
         assertThat((stopBtn as Button).text.toString()).contains("Stop Recording")
+    }
+    
+    @Test
+    fun testActivityWithEmulatorDetection_handlesGracefully() {
+        // This test verifies that MainActivity can handle emulator environment
+        // without crashing during initialization
+        val controller = Robolectric.buildActivity(MainActivity::class.java)
+        val activity = controller.create().start().resume().get()
+        
+        assertThat(activity).isNotNull()
+        
+        // The activity should handle emulator environment gracefully
+        // This test passes if no exceptions are thrown during lifecycle
+        
+        controller.pause().stop().destroy()
     }
 }
