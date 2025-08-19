@@ -12,6 +12,7 @@ import androidx.camera.video.*
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.yourcompany.sensorspoke.sensors.SensorRecorder
+import com.yourcompany.sensorspoke.utils.EmulatorUtils
 import com.yourcompany.sensorspoke.utils.PreviewBus
 import com.yourcompany.sensorspoke.utils.TimeManager
 import kotlinx.coroutines.*
@@ -44,6 +45,7 @@ class RgbCameraRecorder(
         val rgbDir = sessionDir
         if (!rgbDir.exists()) rgbDir.mkdirs()
         val framesDir = File(rgbDir, "frames").apply { mkdirs() }
+        
         // Open CSV for JPEG index
         csvFile = File(rgbDir, "rgb.csv")
         csvWriter = java.io.BufferedWriter(java.io.FileWriter(csvFile!!, true))
@@ -51,52 +53,67 @@ class RgbCameraRecorder(
             csvWriter!!.write("timestamp_ns,filename\n")
             csvWriter!!.flush()
         }
-        // Use session start timestamp in video filename for traceability
-        val sessionStartTs = TimeManager.nowNanos()
-        val videoFile = File(rgbDir, "video_$sessionStartTs.mp4")
+        
+        // Check if running on emulator and if camera is available
+        val isEmulator = EmulatorUtils.isRunningOnEmulator()
+        val hasCamera = EmulatorUtils.isCameraAvailable(context)
+        
+        if (isEmulator && !hasCamera) {
+            android.util.Log.i("RgbCameraRecorder", "Running on emulator without camera - creating simulation mode files")
+            // Create placeholder video file for emulator
+            val sessionStartTs = TimeManager.nowNanos()
+            val videoFile = File(rgbDir, "video_${sessionStartTs}_emulator_placeholder.mp4")
+            videoFile.createNewFile()
+            return
+        }
+        
+        try {
+            // Use session start timestamp in video filename for traceability
+            val sessionStartTs = TimeManager.nowNanos()
+            val videoFile = File(rgbDir, "video_$sessionStartTs.mp4")
 
-        val provider = ProcessCameraProvider.getInstance(context).get()
-        cameraProvider = provider
+            val provider = ProcessCameraProvider.getInstance(context).get()
+            cameraProvider = provider
 
-        // Build Recorder for 1080p
-        val recorder =
-            Recorder.Builder()
-                .setQualitySelector(
-                    QualitySelector.from(
-                        Quality.FHD,
-                        FallbackStrategy.higherQualityOrLowerThan(Quality.FHD),
-                    ),
-                )
-                .build()
-        videoCapture = VideoCapture.withOutput(recorder)
+            // Build Recorder for 1080p
+            val recorder =
+                Recorder.Builder()
+                    .setQualitySelector(
+                        QualitySelector.from(
+                            Quality.FHD,
+                            FallbackStrategy.higherQualityOrLowerThan(Quality.FHD),
+                        ),
+                    )
+                    .build()
+            videoCapture = VideoCapture.withOutput(recorder)
 
-        // ImageCapture for high-res stills
-        imageCapture =
-            ImageCapture.Builder()
-                .setTargetRotation(Surface.ROTATION_0)
-                .setJpegQuality(95)
-                .build()
+            // ImageCapture for high-res stills
+            imageCapture =
+                ImageCapture.Builder()
+                    .setTargetRotation(Surface.ROTATION_0)
+                    .setJpegQuality(95)
+                    .build()
 
-        // Unbind then bind
-        provider.unbindAll()
-        val useCases = mutableListOf<androidx.camera.core.UseCase>()
-        imageCapture?.let { useCases.add(it) }
-        videoCapture?.let { useCases.add(it) }
-        provider.bindToLifecycle(lifecycleOwner, cameraSelector, *useCases.toTypedArray())
+                // Unbind then bind
+            provider.unbindAll()
+            val useCases = mutableListOf<androidx.camera.core.UseCase>()
+            imageCapture?.let { useCases.add(it) }
+            videoCapture?.let { useCases.add(it) }
+            provider.bindToLifecycle(lifecycleOwner, cameraSelector, *useCases.toTypedArray())
 
-        // Start video recording
-        val outputOpts = FileOutputOptions.Builder(videoFile).build()
-        recording =
-            videoCapture!!.output
-                .prepareRecording(context, outputOpts)
-                .start(ContextCompat.getMainExecutor(context)) { /* events ignored */ }
+            // Start video recording
+            val outputOpts = FileOutputOptions.Builder(videoFile).build()
+            recording =
+                videoCapture!!.output
+                    .prepareRecording(context, outputOpts)
+                    .start(ContextCompat.getMainExecutor(context)) { /* events ignored */ }
 
-        // Start still capture loop throttled to ~6–8 FPS for preview + file archival
-        scope.launch {
-            while (isActive) {
-                val ts = TimeManager.nowNanos()
-                val outFile = File(framesDir, "frame_$ts.jpg")
-                val output = ImageCapture.OutputFileOptions.Builder(outFile).build()
+            // Start still capture loop throttled to ~6–8 FPS for preview + file archival
+            scope.launch {
+                while (isActive) {
+                    val ts = TimeManager.nowNanos()
+                    val outFile = File(framesDir, "frame_$ts.jpg")
+                    val output = ImageCapture.OutputFileOptions.Builder(outFile).build()
                 val ic = imageCapture ?: break
                 ic.takePicture(
                     output,
@@ -145,6 +162,15 @@ class RgbCameraRecorder(
                 // ~6–8 FPS loop (~150ms)
                 delay(150)
             }
+        }
+        
+        } catch (e: Exception) {
+            android.util.Log.e("RgbCameraRecorder", "Camera initialization failed", e)
+            // Create placeholder files for graceful degradation
+            val sessionStartTs = TimeManager.nowNanos()
+            val videoFile = File(rgbDir, "video_${sessionStartTs}_error.mp4")
+            videoFile.createNewFile()
+            throw e
         }
     }
 

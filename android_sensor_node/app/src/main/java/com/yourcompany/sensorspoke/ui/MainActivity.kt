@@ -25,6 +25,7 @@ import com.yourcompany.sensorspoke.sensors.gsr.ShimmerRecorder
 import com.yourcompany.sensorspoke.sensors.rgb.RgbCameraRecorder
 import com.yourcompany.sensorspoke.sensors.thermal.ThermalCameraRecorder
 import com.yourcompany.sensorspoke.service.RecordingService
+import com.yourcompany.sensorspoke.utils.EmulatorUtils
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -76,6 +77,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Log environment info for debugging
+        android.util.Log.i("MainActivity", "Starting app: ${EmulatorUtils.getEnvironmentInfo()}")
+        
+        // Check if running on emulator and log hardware capabilities
+        val isEmulator = EmulatorUtils.isRunningOnEmulator()
+        val hasCamera = EmulatorUtils.isCameraAvailable(this)
+        val hasBluetooth = EmulatorUtils.isBluetoothAvailable(this)
+        val hasUsbHost = EmulatorUtils.isUsbHostAvailable(this)
+        
+        android.util.Log.i("MainActivity", "Hardware capabilities - Camera: $hasCamera, Bluetooth: $hasBluetooth, USB: $hasUsbHost")
+        
+        if (isEmulator) {
+            android.util.Log.i("MainActivity", "Running on emulator - will use simulation mode for sensors")
+        }
+        
         // Simple UI with Start/Stop buttons
         val layout =
             LinearLayout(this).apply {
@@ -90,11 +107,16 @@ class MainActivity : ComponentActivity() {
 
         // Ensure background service for NSD + TCP server is running (skip during unit tests)
         if (!isRunningUnderTest()) {
-            val svcIntent = Intent(this, RecordingService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(svcIntent)
-            } else {
-                startService(svcIntent)
+            try {
+                val svcIntent = Intent(this, RecordingService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(svcIntent)
+                } else {
+                    startService(svcIntent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Failed to start recording service", e)
+                Toast.makeText(this, "Warning: Background service failed to start", Toast.LENGTH_LONG).show()
             }
         }
 
@@ -136,10 +158,41 @@ class MainActivity : ComponentActivity() {
         val existing = controller
         if (existing != null) return existing
         val c = RecordingController(applicationContext)
-        // Register recorders
-        c.register("rgb", RgbCameraRecorder(applicationContext, this))
-        c.register("thermal", ThermalCameraRecorder())
-        c.register("gsr", ShimmerRecorder())
+        
+        // Register recorders based on hardware availability
+        val isEmulator = EmulatorUtils.isRunningOnEmulator()
+        val hasCamera = EmulatorUtils.isCameraAvailable(this)
+        val hasBluetooth = EmulatorUtils.isBluetoothAvailable(this)
+        val hasUsbHost = EmulatorUtils.isUsbHostAvailable(this)
+        
+        try {
+            // RGB camera recorder - only if camera is available or we're on emulator (will simulate)
+            if (hasCamera || isEmulator) {
+                c.register("rgb", RgbCameraRecorder(applicationContext, this))
+                android.util.Log.i("MainActivity", "Registered RGB camera recorder")
+            } else {
+                android.util.Log.w("MainActivity", "Camera not available - skipping RGB recorder")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to register RGB camera recorder", e)
+        }
+        
+        try {
+            // Thermal camera recorder - register but it will handle USB availability internally
+            c.register("thermal", ThermalCameraRecorder())
+            android.util.Log.i("MainActivity", "Registered thermal camera recorder")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to register thermal camera recorder", e)
+        }
+        
+        try {
+            // GSR recorder - register but it will handle Bluetooth availability internally
+            c.register("gsr", ShimmerRecorder())
+            android.util.Log.i("MainActivity", "Registered GSR recorder")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to register GSR recorder", e)
+        }
+        
         controller = c
         return c
     }

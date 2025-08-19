@@ -10,10 +10,12 @@ import android.hardware.camera2.CameraManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Base64
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.yourcompany.sensorspoke.R
 import com.yourcompany.sensorspoke.network.FileTransferManager
 import com.yourcompany.sensorspoke.network.NetworkClient
+import com.yourcompany.sensorspoke.utils.EmulatorUtils
 import com.yourcompany.sensorspoke.utils.PreviewBus
 import kotlinx.coroutines.*
 import org.json.JSONArray
@@ -89,26 +91,36 @@ class RecordingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startInForeground() {
-        val channelId = "recording_service_channel"
-        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel =
-                NotificationChannel(
-                    channelId,
-                    getString(R.string.notification_channel_name),
-                    NotificationManager.IMPORTANCE_LOW,
-                )
-            channel.description = getString(R.string.notification_channel_desc)
-            nm.createNotificationChannel(channel)
+        try {
+            val channelId = "recording_service_channel"
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            
+            Log.i("RecordingService", "Starting foreground service - ${EmulatorUtils.getEnvironmentInfo()}")
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel =
+                    NotificationChannel(
+                        channelId,
+                        getString(R.string.notification_channel_name),
+                        NotificationManager.IMPORTANCE_LOW,
+                    )
+                channel.description = getString(R.string.notification_channel_desc)
+                nm.createNotificationChannel(channel)
+            }
+            
+            val notification: Notification =
+                NotificationCompat.Builder(this, channelId)
+                    .setContentTitle(getString(R.string.notification_title))
+                    .setContentText(getString(R.string.notification_text))
+                    .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth) // placeholder icon
+                    .setOngoing(true)
+                    .build()
+            startForeground(1001, notification)
+            
+        } catch (e: Exception) {
+            Log.e("RecordingService", "Failed to start foreground service", e)
+            // Continue running as background service if foreground fails
         }
-        val notification: Notification =
-            NotificationCompat.Builder(this, channelId)
-                .setContentTitle(getString(R.string.notification_title))
-                .setContentText(getString(R.string.notification_text))
-                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth) // placeholder icon
-                .setOngoing(true)
-                .build()
-        startForeground(1001, notification)
     }
 
     private suspend fun startServerAndAdvertise() {
