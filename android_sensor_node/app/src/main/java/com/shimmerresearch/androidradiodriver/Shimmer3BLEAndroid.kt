@@ -78,7 +78,7 @@ class Shimmer3BLEAndroid(
 
         try {
             // Start BLE scanning for specific device
-            scanAndConnect(bluetoothAddress, deviceName)
+            scanAndConnect(bluetoothAddress)
         } catch (e: Exception) {
             Log.e(TAG, "Error initiating connection: ${e.message}", e)
             processStateChange(ShimmerBluetooth.BT_STATE.DISCONNECTED)
@@ -87,7 +87,6 @@ class Shimmer3BLEAndroid(
 
     private fun scanAndConnect(
         targetAddress: String,
-        deviceName: String,
     ) {
         if (mIsScanning) {
             Log.w(TAG, "Already scanning for devices")
@@ -106,17 +105,17 @@ class Shimmer3BLEAndroid(
                 @SuppressLint("MissingPermission")
                 override fun onLeScan(bleDevice: BleDevice) {
                     val device = bleDevice.device
-                    val deviceName = try {
+                    val detectedName = try {
                         device.name
                     } catch (e: SecurityException) {
                         null
                     }
 
                     if (device.address == targetAddress ||
-                        deviceName?.contains("Shimmer", ignoreCase = true) == true ||
-                        deviceName?.contains("GSR", ignoreCase = true) == true
+                        detectedName?.contains("Shimmer", ignoreCase = true) == true ||
+                        detectedName?.contains("GSR", ignoreCase = true) == true
                     ) {
-                        Log.i(TAG, "Found target Shimmer device: $deviceName (${device.address})")
+                        Log.i(TAG, "Found target Shimmer device: $detectedName (${device.address})")
                         BleManager.getInstance().cancelScan()
                         connectToDevice(bleDevice)
                     }
