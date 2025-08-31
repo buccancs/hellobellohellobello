@@ -51,6 +51,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        // Set language version to support advanced features like break/continue in inline lambdas
+        languageVersion = "1.9"
+        apiVersion = "1.9"
         // Performance: enable incremental compilation
         freeCompilerArgs +=
             listOf(

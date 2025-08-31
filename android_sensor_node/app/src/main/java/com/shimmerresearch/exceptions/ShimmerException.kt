@@ -3,7 +3,7 @@ package com.shimmerresearch.exceptions
 /**
  * Shimmer-specific exception class from ShimmerAndroidAPI
  */
-open class ShimmerException : Exception {
+open class ShimmerException : kotlin.Exception {
     constructor() : super()
 
     constructor(message: String) : super(message)
