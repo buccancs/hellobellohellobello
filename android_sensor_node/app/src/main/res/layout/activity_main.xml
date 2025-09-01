@@ -1,146 +1,143 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/c_bg_white">
+    android:fitsSystemWindows="true"
+    android:clipChildren="false"
+    android:background="#16131e"
+    tools:context="com.topdon.tc001.MainActivity">
 
-    <!-- Status bar showing connection/recording status -->
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/status_background"
-        android:padding="12dp"
-        android:text="@string/status_initializing"
-        android:textColor="@color/status_text"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:gravity="center" />
-
-    <!-- Main content area - IRCamera style -->
-    <LinearLayout
-        android:layout_width="match_parent"
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/view_page"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:padding="32dp"
-        android:gravity="center">
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/cl_bottom" />
 
-        <!-- App branding -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/top_infrared_up_case"
-            android:textColor="@color/white"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/cl_bottom"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintDimensionRatio="375:56"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/see_more_than"
-            android:textColor="@color/color_CCFFFFFF"
-            android:textSize="16sp"
-            android:layout_marginBottom="48dp" />
+        <ImageView
+            android:id="@+id/iv_bottom_main_bg"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:scaleType="fitXY"
+            android:src="@drawable/ic_main_bg_not_select"
+            android:contentDescription="@null"
+            app:layout_constraintDimensionRatio="1125:255"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
 
-        <!-- Device Connection Area - IRCamera Style -->
-        <LinearLayout
-            android:id="@+id/deviceConnectionLayout"
-            android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:orientation="horizontal"
-            android:background="@drawable/selector_device_connect_bg"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="16dp"
-            android:gravity="center_vertical">
+        <View
+            android:id="@+id/view_main"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintWidth_percent="0.28"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
-            <!-- Device Icon Connected -->
+        <!-- 图库 -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/cl_icon_gallery"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintWidth_percent="0.28"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/view_main">
             <ImageView
-                android:id="@+id/deviceIconConnected"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:src="@drawable/ic_main_device_bg_has"
-                android:visibility="gone" />
-
-            <!-- Device Icon Disconnected -->
-            <ImageView
-                android:id="@+id/deviceIconDisconnected"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:src="@drawable/ic_main_device_bg_not"
-                android:visibility="visible" />
-
-            <!-- Device Info -->
-            <LinearLayout
+                android:id="@+id/iv_icon_gallery"
                 android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:src="@drawable/selector_gallery"
+                android:contentDescription="@null"
+                app:layout_constraintWidth_percent="0.17"
+                app:layout_constraintDimensionRatio="1:1"
+                app:layout_constraintVertical_chainStyle="packed"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tv_icon_gallery" />
+            <TextView
+                android:id="@+id/tv_icon_gallery"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginStart="16dp">
+                android:layout_marginTop="4dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/tc_local_album"
+                android:textSize="11sp"
+                android:textColor="@color/tab_text"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/iv_icon_gallery"
+                app:layout_constraintBottom_toBottomOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
-                <TextView
-                    android:id="@+id/deviceNameText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/tc_connect_device"
-                    android:textColor="@color/device_connect_name"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/deviceStatusText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Tap to connect"
-                    android:textColor="@color/device_connect_state"
-                    android:textSize="14sp"
-                    android:layout_marginTop="4dp" />
-
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- Connection Type Info -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/tc_connect_line"
-            android:textColor="@color/color_CCFFFFFF"
-            android:textSize="14sp"
-            android:layout_marginTop="16dp" />
-
-    </LinearLayout>
-
-    <!-- Control bar at bottom - Simplified -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
-        android:background="@color/control_background">
-
-        <Button
-            android:id="@+id/btnStartRecording"
+        <!-- 我的 -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/cl_icon_mine"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="@string/start_recording"
-            style="@style/Widget.Material3.Button" />
-
-        <Button
-            android:id="@+id/btnStopRecording"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="@string/stop_recording"
-            android:enabled="false"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
-
-    </LinearLayout>
-
-</LinearLayout>
+            android:layout_height="0dp"
+            app:layout_constraintWidth_percent="0.28"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/view_main">
+            <ImageView
+                android:id="@+id/iv_icon_mine"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:src="@drawable/selector_mine"
+                android:contentDescription="@null"
+                app:layout_constraintWidth_percent="0.17"
+                app:layout_constraintDimensionRatio="1:1"
+                app:layout_constraintVertical_chainStyle="packed"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tv_icon_mine" />
+            <View
+                android:id="@+id/view_mine_point"
+                android:layout_width="8sp"
+                android:layout_height="8sp"
+                android:layout_marginTop="-2dp"
+                android:background="@drawable/shape_oval_ff0000"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:ignore="SmallSp"
+                app:layout_constraintTop_toTopOf="@id/iv_icon_mine"
+                app:layout_constraintStart_toEndOf="@id/iv_icon_mine" />
+            <TextView
+                android:id="@+id/tv_icon_mine"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/main_mine"
+                android:textSize="11sp"
+                android:textColor="@color/tab_text"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/iv_icon_mine"
+                app:layout_constraintBottom_toBottomOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

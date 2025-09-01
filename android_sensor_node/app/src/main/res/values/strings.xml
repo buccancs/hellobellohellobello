@@ -1,69 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Sensor Spoke</string>
-    <string name="notification_channel_name">Recording Service</string>
-    <string name="notification_channel_desc">Foreground service for network communication</string>
-    <string name="notification_title">Sensor Spoke Running</string>
-    <string name="notification_text">Advertising service and awaiting PC connection</string>
-
-    <!-- UI Strings -->
-    <string name="start_recording">Start Recording</string>
-    <string name="stop_recording">Stop Recording</string>
-    <string name="tab_rgb_preview">RGB Camera</string>
-    <string name="tab_thermal_preview">Thermal Camera</string>
-    <string name="tab_file_manager">Files</string>
-    <string name="no_preview_available">No preview available</string>
-    <string name="camera_not_available">Camera not available</string>
-    <string name="thermal_not_connected">Thermal camera not connected</string>
-
-    <!-- Status Messages -->
-    <string name="status_initializing">Initializing...</string>
-    <string name="status_ready">Ready to connect</string>
-    <string name="status_connecting">Connecting to PC Hub...</string>
-    <string name="status_connected">Connected to PC Hub</string>
-    <string name="status_recording">Recording in progress</string>
-    <string name="status_stopping">Stopping recording...</string>
-
-    <!-- Menu Items -->
-    <string name="menu_quick_start">Quick Start Guide</string>
-    <string name="menu_connection_help">Connection Help</string>
-    <string name="menu_reset_tutorial">Reset Tutorial</string>
-
-    <!-- User Experience Messages -->
-    <string name="permission_camera_explanation">Camera access is required to record RGB video and capture synchronization frames</string>
-    <string name="permission_microphone_explanation">Microphone access is needed for audio recording during physiological measurements</string>
-    <string name="permission_storage_explanation">Storage access is required to save recorded data and transfer files to the PC Hub</string>
-
-    <!-- Quick Start Steps -->
-    <string name="quick_start_step_1">Connect to WiFi</string>
-    <string name="quick_start_step_1_desc">Ensure your device is connected to the same WiFi network as the PC Hub</string>
-    <string name="quick_start_step_2">Grant Permissions</string>
-    <string name="quick_start_step_2_desc">Allow camera, microphone, and storage access when prompted</string>
-    <string name="quick_start_step_3">Connect Sensors</string>
-    <string name="quick_start_step_3_desc">Power on Shimmer GSR sensor and connect thermal camera via USB</string>
-    <string name="quick_start_step_4">Find PC Hub</string>
-    <string name="quick_start_step_4_desc">App will automatically discover the PC Hub on your network</string>
-    <string name="quick_start_step_5">Start Recording</string>
-    <string name="quick_start_step_5_desc">Tap \"Start Recording\" when all sensors show as connected</string>
-    <string name="quick_start_step_6">Monitor Status</string>
-    <string name="quick_start_step_6_desc">Use the tabs to preview camera feeds and monitor sensor data</string>
-
-    <!-- IRCamera strings -->
+    <string name="app_name">IRCamera</string>
+    
+    <!-- Main Activity -->
+    <string name="tc_local_album">Gallery</string>
+    <string name="main_mine">Mine</string>
     <string name="top_infrared_up_case">TOPDON INFRARED</string>
-    <string name="see_more_than">See More Than Your Eyes Can See</string>
+    <string name="see_more_than">See more than meets the eye</string>
     <string name="tc_connect_device">Connect Device</string>
-    <string name="tc_connect_line">Wired Connection</string>
-    <string name="tc_connect_wifi">WiFi Connection</string>
-    <string name="tc_has_line_device">Wired Device</string>
-    <string name="tc_delete_device">Delete Device</string>
-    <string name="tc_delete_device_tips">Are you sure you want to delete this device?</string>
-    <string name="app_got_it">Got it</string>
+    
+    <!-- Permissions -->
+    <string name="permission_request_camera_app">%1$s needs camera permission to capture thermal images.</string>
+    <string name="permission_request_storage_app">%1$s needs storage permission to save images and videos.</string>
+    
+    <!-- Common -->
     <string name="app_confirm">Confirm</string>
     <string name="app_cancel">Cancel</string>
     <string name="app_yes">Yes</string>
     <string name="app_no">No</string>
-    <string name="report_delete">Delete</string>
-    <string name="test_results_delete_success">Delete successful</string>
-    <string name="device_reset_alert">Device has been reset</string>
+    <string name="app_tip">Tip</string>
+    <string name="app_got_it">Got it</string>
+    <string name="app_open">Open</string>
+    <string name="app_camera_content">Camera permission denied</string>
+    <string name="app_album_content">Storage permission denied</string>
+    
+    <!-- Device -->
     <string name="device_disconnect_alert">Device disconnected</string>
-    <string name="main_exit">Are you sure you want to exit %s?</string>
+    <string name="device_reset_alert">Device reset detected</string>
+    
+    <!-- Main -->
+    <string name="main_exit">Exit %1$s?</string>
 </resources>

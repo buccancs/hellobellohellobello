@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/selected_color</item>
+        <item name="colorPrimaryDark">@color/toolbar_16131E</item>
+        <item name="colorAccent">@color/selected_color</item>
+        <item name="android:windowBackground">@color/toolbar_16131E</item>
+        <item name="android:statusBarColor">@color/toolbar_16131E</item>
+        <item name="android:navigationBarColor">@color/toolbar_16131E</item>
+    </style>
+
+    <style name="Splash" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/toolbar_16131E</item>
+        <item name="android:statusBarColor">@color/toolbar_16131E</item>
+        <item name="android:navigationBarColor">@color/toolbar_16131E</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+
+    <style name="Blank" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/black</item>
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:navigationBarColor">@color/black</item>
+    </style>
+</resources>

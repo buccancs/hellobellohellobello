@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- TC001ConnectionGuideView custom attributes -->
-    <declare-styleable name="TC001ConnectionGuideView">
-        <attr name="guide_icon" format="reference" />
-        <attr name="guide_text" format="string" />
-        <attr name="guide_icon_show" format="boolean" />
-    </declare-styleable>
-</resources>
