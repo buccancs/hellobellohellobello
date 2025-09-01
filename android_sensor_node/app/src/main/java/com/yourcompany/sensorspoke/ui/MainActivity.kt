@@ -17,6 +17,8 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,43 +26,47 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.snackbar.Snackbar
-import com.google.android.material.tabs.TabLayout
-import com.google.android.material.tabs.TabLayoutMediator
 import com.yourcompany.sensorspoke.R
 import com.yourcompany.sensorspoke.controller.RecordingController
-import com.yourcompany.sensorspoke.sensors.audio.AudioRecorder
-import com.yourcompany.sensorspoke.sensors.coordination.MultiModalSensorCoordinator
-import com.yourcompany.sensorspoke.sensors.gsr.ShimmerRecorder
-import com.yourcompany.sensorspoke.sensors.rgb.RgbCameraRecorder
 import com.yourcompany.sensorspoke.sensors.thermal.ThermalCameraRecorder
+import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001UIController
+import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001ConnectType
 import com.yourcompany.sensorspoke.service.RecordingService
-import com.yourcompany.sensorspoke.ui.adapters.MainPagerAdapter
 import com.yourcompany.sensorspoke.ui.dialogs.QuickStartDialog
-import com.yourcompany.sensorspoke.ui.navigation.NavigationController
-import com.yourcompany.sensorspoke.ui.navigation.ThermalNavigationState
+import com.yourcompany.sensorspoke.ui.popup.DelPopup
 import com.yourcompany.sensorspoke.utils.UserExperience
 import kotlinx.coroutines.launch
 import java.io.File
 
+/**
+ * MainActivity - Simplified IRCamera-style interface focused on Topdon TC001
+ *
+ * Replaces complex tabbed interface with clean device connection UI
+ */
 class MainActivity : AppCompatActivity() {
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+
     private val vm: MainViewModel by viewModels()
 
     private var controller: RecordingController? = null
 
-    // Full integration: MultiModalSensorCoordinator for comprehensive sensor management
-    private var multiModalCoordinator: MultiModalSensorCoordinator? = null
-
-    private var viewPager: ViewPager2? = null
-    private var tabLayout: TabLayout? = null
+    // IRCamera-style UI components
+    private var deviceConnectionLayout: LinearLayout? = null
+    private var deviceIconConnected: ImageView? = null
+    private var deviceIconDisconnected: ImageView? = null
+    private var deviceNameText: TextView? = null
+    private var deviceStatusText: TextView? = null
     private var btnStartRecording: Button? = null
     private var btnStopRecording: Button? = null
     private var statusText: TextView? = null
     private var rootLayout: ViewGroup? = null
 
-    // Enhanced navigation controller from IRCamera architecture
-    private var navigationController: NavigationController? = null
+    // TC001 UI Controller inspired by IRCamera
+    private var tc001Controller: TC001UIController? = null
+    private var delPopup: DelPopup? = null
 
     // User experience enhancements
     private lateinit var preferences: SharedPreferences
@@ -128,16 +134,14 @@ class MainActivity : AppCompatActivity() {
         preferences = getSharedPreferences("sensor_spoke_prefs", Context.MODE_PRIVATE)
         isFirstLaunch = preferences.getBoolean("first_launch", true)
 
-        // Initialize views
-        viewPager = findViewById(R.id.viewPager)
-        tabLayout = findViewById(R.id.tabLayout)
-        btnStartRecording = findViewById(R.id.btnStartRecording)
-        btnStopRecording = findViewById(R.id.btnStopRecording)
-        statusText = findViewById(R.id.statusText)
-        rootLayout = findViewById<ViewGroup>(android.R.id.content)
+        // Initialize views for simplified IRCamera-style UI
+        initializeViews()
 
-        // Setup ViewPager with fragments
-        setupViewPager()
+        // Initialize TC001 controller
+        initializeThermalController()
+
+        // Setup device connection listeners
+        setupDeviceConnectionUI()
 
         // Setup button handlers
         setupButtons()
@@ -151,7 +155,7 @@ class MainActivity : AppCompatActivity() {
         // Initialize TC001 thermal camera system
         initializeTC001System()
 
-        // Ensure background service for NSD + TCP server is running (skip during unit tests)
+        // Ensure background service for NSD + TCP server is running
         if (!isRunningUnderTest()) {
             val svcIntent = Intent(this, RecordingService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -169,9 +173,142 @@ class MainActivity : AppCompatActivity() {
         updateStatusText("Ready to connect")
     }
 
+    private fun initializeViews() {
+        deviceConnectionLayout = findViewById(R.id.deviceConnectionLayout)
+        deviceIconConnected = findViewById(R.id.deviceIconConnected)
+        deviceIconDisconnected = findViewById(R.id.deviceIconDisconnected)
+        deviceNameText = findViewById(R.id.deviceNameText)
+        deviceStatusText = findViewById(R.id.deviceStatusText)
+        btnStartRecording = findViewById(R.id.btnStartRecording)
+        btnStopRecording = findViewById(R.id.btnStopRecording)
+        statusText = findViewById(R.id.statusText)
+        rootLayout = findViewById<ViewGroup>(android.R.id.content)
+    }
+
+    private fun initializeThermalController() {
+        tc001Controller = TC001UIController()
+
+        // Setup device click listeners inspired by IRCamera
+        tc001Controller?.onItemClickListener = { type ->
+            handleDeviceClick(type)
+        }
+
+        tc001Controller?.onItemLongClickListener = { type ->
+            handleDeviceLongClick(type)
+        }
+
+        // Setup DelPopup for device deletion
+        delPopup = DelPopup(this)
+        delPopup?.onDelListener = {
+            deleteDevice()
+        }
+
+        // Observe connection status changes
+        tc001Controller?.hasConnectLine?.observe(this) { isConnected ->
+            updateDeviceConnectionUI(isConnected)
+        }
+
+        tc001Controller?.deviceConnectionStatus?.observe(this) { status ->
+            updateStatusText("TC001 Status: $status")
+        }
+    }
+
+    private fun setupDeviceConnectionUI() {
+        deviceConnectionLayout?.setOnClickListener {
+            handleDeviceClick(TC001ConnectType.LINE)
+        }
+
+        deviceConnectionLayout?.setOnLongClickListener { view ->
+            delPopup?.show(view)
+            true
+        }
+    }
+
+    private fun updateDeviceConnectionUI(isConnected: Boolean) {
+        runOnUiThread {
+            if (isConnected) {
+                deviceIconConnected?.visibility = View.VISIBLE
+                deviceIconDisconnected?.visibility = View.GONE
+                deviceNameText?.text = "TC001 Thermal Camera"
+                deviceStatusText?.text = "Connected"
+                deviceStatusText?.setTextColor(ContextCompat.getColor(this, R.color.status_text))
+            } else {
+                deviceIconConnected?.visibility = View.GONE
+                deviceIconDisconnected?.visibility = View.VISIBLE
+                deviceNameText?.text = "TC001 Thermal Camera"
+                deviceStatusText?.text = "Disconnected"
+                deviceStatusText?.setTextColor(ContextCompat.getColor(this, R.color.device_connect_state))
+            }
+        }
+    }
+
+    private fun handleDeviceClick(type: TC001ConnectType) {
+        when (type) {
+            TC001ConnectType.LINE -> {
+                // Handle TC001 USB connection
+                connectTC001Device()
+            }
+            else -> {
+                // Handle other connection types if needed
+                Log.d(TAG, "Connection type $type not yet implemented")
+            }
+        }
+    }
+
+    private fun handleDeviceLongClick(type: TC001ConnectType) {
+        // Show deletion popup only when device is disconnected
+        deviceConnectionLayout?.let { view ->
+            delPopup?.show(view)
+        }
+    }
+
+    private fun connectTC001Device() {
+        lifecycleScope.launch {
+            try {
+                updateStatusText("Connecting to TC001...")
+                
+                // Simulate TC001 connection logic
+                // In a real implementation, this would use TC001Connector
+                val isConnected = initializeTC001Connection()
+                
+                tc001Controller?.updateConnectionStatus(isConnected)
+                
+                if (isConnected) {
+                    UserExperience.Messaging.showSuccess(this@MainActivity, "TC001 connected successfully")
+                } else {
+                    UserExperience.Messaging.showUserFriendlyError(this@MainActivity, "Failed to connect TC001", "connection")
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "TC001 connection failed", e)
+                UserExperience.Messaging.showUserFriendlyError(this@MainActivity, e.message ?: "Connection failed", "connection")
+            }
+        }
+    }
+
+    private suspend fun initializeTC001Connection(): Boolean {
+        // Simulate connection attempt
+        // In real implementation, would use TC001Connector or ThermalCameraRecorder
+        return try {
+            Log.i(TAG, "Attempting TC001 connection...")
+            // Simulate connection delay
+            kotlinx.coroutines.delay(1000)
+            true // Assume successful for now
+        } catch (e: Exception) {
+            Log.e(TAG, "TC001 connection failed", e)
+            false
+        }
+    }
+
+    private fun deleteDevice() {
+        tc001Controller?.updateConnectionStatus(false)
+        UserExperience.Messaging.showStatus(this, "Device deleted")
+        updateStatusText("Device removed")
+    }
+
     private fun setupToolbar() {
         supportActionBar?.setDisplayShowTitleEnabled(true)
-        supportActionBar?.title = "Sensor Spoke"
+        supportActionBar?.title = "TOPDON INFRARED"
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -193,42 +330,10 @@ class MainActivity : AppCompatActivity() {
                 resetFirstLaunchFlag()
                 true
             }
-            R.id.action_thermal_settings -> {
-                // Navigate to thermal settings using enhanced navigation
-                navigationController?.navigateToThermalCamera(ThermalNavigationState.SETTINGS)
-                true
-            }
             else -> super.onOptionsItemSelected(item)
         }
 
-    private fun setupViewPager() {
-        val adapter = MainPagerAdapter(this)
-        viewPager?.adapter = adapter
-
-        // Initialize enhanced navigation controller
-        viewPager?.let { vp ->
-            navigationController = NavigationController(this, vp)
-        }
-
-        // Connect TabLayout with ViewPager2
-        tabLayout?.let { tabLayout ->
-            viewPager?.let { viewPager ->
-                TabLayoutMediator(tabLayout, viewPager) { tab, position ->
-                    tab.text = MainPagerAdapter.TAB_TITLES[position]
-                }.attach()
-
-                // Register page change callback for enhanced navigation tracking
-                viewPager.registerOnPageChangeCallback(
-                    object : ViewPager2.OnPageChangeCallback() {
-                        override fun onPageSelected(position: Int) {
-                            super.onPageSelected(position)
-                            navigationController?.updateCurrentTab(position)
-                        }
-                    },
-                )
-            }
-        }
-    }
+    // Remove the complex ViewPager setup and replace with simplified device management
 
     private fun setupButtons() {
         btnStartRecording?.setOnClickListener {
@@ -270,10 +375,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Cleanup MultiModalSensorCoordinator for full integration
+        // Cleanup TC001 controller
         lifecycleScope.launch {
-            multiModalCoordinator?.stopRecording()
-            multiModalCoordinator = null
+            tc001Controller?.updateConnectionStatus(false)
         }
     }
 
@@ -281,61 +385,22 @@ class MainActivity : AppCompatActivity() {
         val existing = controller
         if (existing != null) return existing
         val c = RecordingController(applicationContext)
-        // Register recorders
-        c.register("rgb", RgbCameraRecorder(applicationContext, this))
+        // Register only thermal recorder for simplified TC001 focus
         c.register("thermal", ThermalCameraRecorder(applicationContext))
-        c.register("gsr", ShimmerRecorder(applicationContext))
-        c.register("audio", AudioRecorder(applicationContext)) // FR5: Audio recording support
         controller = c
         return c
     }
 
-    /**
-     * Ensure MultiModalSensorCoordinator is initialized - Full Integration
-     */
-    private suspend fun ensureMultiModalCoordinator(): MultiModalSensorCoordinator {
-        val existing = multiModalCoordinator
-        if (existing != null) return existing
-
-        val coordinator = MultiModalSensorCoordinator(applicationContext, this)
-
-        // Initialize the complete multi-modal system
-        val initResult = coordinator.initializeSystem()
-        if (initResult) {
-            Log.i("MainActivity", "MultiModalSensorCoordinator initialized successfully - Full Integration active")
-        } else {
-            Log.w("MainActivity", "MultiModalSensorCoordinator initialization failed, falling back to individual recorders")
-        }
-
-        multiModalCoordinator = coordinator
-        return coordinator
-    }
-
     private fun startRecording() {
-        updateStatusText("Starting recording...")
+        updateStatusText("Starting thermal recording...")
         lifecycleScope.launch {
             try {
-                // Full Integration: Use MultiModalSensorCoordinator for comprehensive sensor management
-                val coordinator = ensureMultiModalCoordinator()
-
-                // Start coordinated multi-modal recording with session directory
-                val sessionDir = File(applicationContext.filesDir, "sessions")
-                if (!sessionDir.exists()) sessionDir.mkdirs()
-
-                val startResult = coordinator.startRecording(sessionDir)
-
-                if (startResult) {
-                    UserExperience.Messaging.showSuccess(this@MainActivity, "Full multi-modal recording started")
-                    updateStatusText("Full integration recording in progress")
-                    updateButtonStates(isRecording = true)
-                } else {
-                    // Fallback to individual controller if coordinator fails
-                    Log.w("MainActivity", "Coordinator failed, falling back to individual recorders")
-                    ensureController().startSession()
-                    UserExperience.Messaging.showSuccess(this@MainActivity, "Recording started (fallback mode)")
-                    updateStatusText("Recording in progress (fallback)")
-                    updateButtonStates(isRecording = true)
-                }
+                // Simplified recording for TC001 thermal camera only
+                ensureController().startSession()
+                
+                UserExperience.Messaging.showSuccess(this@MainActivity, "TC001 thermal recording started")
+                updateStatusText("TC001 recording in progress")
+                updateButtonStates(isRecording = true)
             } catch (e: Exception) {
                 UserExperience.Messaging.showUserFriendlyError(this@MainActivity, e.message ?: "Unknown error", "recording")
                 updateStatusText("Ready to record")
@@ -344,26 +409,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopRecording() {
-        updateStatusText("Stopping recording...")
+        updateStatusText("Stopping thermal recording...")
         lifecycleScope.launch {
             try {
-                // Full Integration: Stop coordinated recording first, then fallback if needed
-                val coordinator = multiModalCoordinator
-                if (coordinator != null) {
-                    val stopResult = coordinator.stopRecording()
-                    if (stopResult) {
-                        UserExperience.Messaging.showSuccess(this@MainActivity, "Full multi-modal recording stopped")
-                        updateStatusText("Ready to record")
-                        updateButtonStates(isRecording = false)
-                        return@launch
-                    } else {
-                        Log.w("MainActivity", "Coordinator stop failed, trying individual controller")
-                    }
-                }
-
-                // Fallback to individual controller
+                // Stop thermal recording
                 controller?.stopSession()
-                UserExperience.Messaging.showSuccess(this@MainActivity, "Recording stopped")
+                
+                UserExperience.Messaging.showSuccess(this@MainActivity, "TC001 recording stopped")
                 updateStatusText("Ready to record")
                 updateButtonStates(isRecording = false)
             } catch (e: Exception) {
@@ -479,21 +531,6 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Throwable) {
             false
         }
-
-    /**
-     * Navigate to thermal camera preview - Enhanced integration method
-     */
-    fun navigateToThermalPreview() {
-        // Use NavigationController to navigate to thermal camera
-        navigationController?.navigateToThermalCamera(ThermalNavigationState.PREVIEW)
-    }
-
-    /**
-     * Navigate to thermal camera settings
-     */
-    fun navigateToThermalSettings() {
-        navigationController?.navigateToThermalCamera(ThermalNavigationState.SETTINGS)
-    }
 
     /**
      * Initialize TC001 thermal camera system

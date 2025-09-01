@@ -134,14 +134,11 @@ class EnhancedMainFragment :
     private fun handleDeviceConnection(type: TC001ConnectType) {
         when (type) {
             TC001ConnectType.LINE -> {
-                // Navigate to thermal camera interface and initiate TC001 connection
+                // Handle TC001 connection directly (simplified for main interface)
                 CoroutineScope(Dispatchers.Main).launch {
-                    // Start thermal preview for TC001
-                    (activity as? MainActivity)?.navigateToThermalPreview()
-
                     // Update UI to show connection attempt
                     uiController.updateConnectionStatus(true)
-                    Log.i("EnhancedMainFragment", "Navigating to thermal preview and updating connection status")
+                    Log.i("EnhancedMainFragment", "TC001 connection attempt via simplified interface")
                 }
             }
             TC001ConnectType.WIFI -> {

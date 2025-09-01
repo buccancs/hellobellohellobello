@@ -2,7 +2,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@color/c_bg_white">
 
     <!-- Status bar showing connection/recording status -->
     <TextView
@@ -17,20 +18,103 @@
         android:textStyle="bold"
         android:gravity="center" />
 
-    <!-- Tab Layout for navigation -->
-    <com.google.android.material.tabs.TabLayout
-        android:id="@+id/tabLayout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <!-- ViewPager for fragments -->
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/viewPager"
+    <!-- Main content area - IRCamera style -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:gravity="center">
 
-    <!-- Control bar at bottom -->
+        <!-- App branding -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/top_infrared_up_case"
+            android:textColor="@color/white"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/see_more_than"
+            android:textColor="@color/color_CCFFFFFF"
+            android:textSize="16sp"
+            android:layout_marginBottom="48dp" />
+
+        <!-- Device Connection Area - IRCamera Style -->
+        <LinearLayout
+            android:id="@+id/deviceConnectionLayout"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:orientation="horizontal"
+            android:background="@drawable/selector_device_connect_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="16dp"
+            android:gravity="center_vertical">
+
+            <!-- Device Icon Connected -->
+            <ImageView
+                android:id="@+id/deviceIconConnected"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:src="@drawable/ic_main_device_bg_has"
+                android:visibility="gone" />
+
+            <!-- Device Icon Disconnected -->
+            <ImageView
+                android:id="@+id/deviceIconDisconnected"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:src="@drawable/ic_main_device_bg_not"
+                android:visibility="visible" />
+
+            <!-- Device Info -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="16dp">
+
+                <TextView
+                    android:id="@+id/deviceNameText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/tc_connect_device"
+                    android:textColor="@color/device_connect_name"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/deviceStatusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tap to connect"
+                    android:textColor="@color/device_connect_state"
+                    android:textSize="14sp"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Connection Type Info -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/tc_connect_line"
+            android:textColor="@color/color_CCFFFFFF"
+            android:textSize="14sp"
+            android:layout_marginTop="16dp" />
+
+    </LinearLayout>
+
+    <!-- Control bar at bottom - Simplified -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
