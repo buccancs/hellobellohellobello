@@ -37,7 +37,7 @@ class MainActivity : BaseActivity(), View.OnClickListener {
             str.append("BRAND: ${Build.BRAND}").append("\n")
             str.append("MODEL: ${Build.MODEL}").append("\n")
             str.append("PRODUCT: ${Build.PRODUCT}").append("\n")
-            str.append("CPU_ABI: ${Build.CPU_ABI}").append("\n")
+            str.append("CPU_ABI: ${Build.SUPPORTED_ABIS.joinToString(",")}").append("\n")
             str.append("SDK_INT: ${Build.VERSION.SDK_INT}").append("\n")
             str.append("RELEASE: ${Build.VERSION.RELEASE}").append("\n")
             println(str)

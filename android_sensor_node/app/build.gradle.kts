@@ -85,6 +85,9 @@ android {
 }
 
 dependencies {
+    // Local library module
+    implementation(project(":android_sensor_node:libapp"))
+    
     // AndroidX
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.core:core-ktx:1.12.0")

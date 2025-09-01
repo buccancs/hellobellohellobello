@@ -5,8 +5,11 @@ import androidx.appcompat.app.AppCompatActivity
 
 abstract class BaseActivity : AppCompatActivity() {
 
+    protected var savedInstanceState: Bundle? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        this.savedInstanceState = savedInstanceState
         setContentView(initContentView())
         initView()
         initData()

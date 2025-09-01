@@ -48,6 +48,8 @@ if (hasAndroidSdk) {
     project(":android_sensor_node").projectDir = file("android_sensor_node")
     include(":android_sensor_node:app")
     project(":android_sensor_node:app").projectDir = file("android_sensor_node/app")
+    include(":android_sensor_node:libapp")
+    project(":android_sensor_node:libapp").projectDir = file("android_sensor_node/libapp")
 } else {
     println("[settings] Android SDK not found; skipping inclusion of :android_sensor_node modules")
 }

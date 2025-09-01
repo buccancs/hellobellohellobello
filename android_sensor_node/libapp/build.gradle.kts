@@ -1,7 +1,6 @@
 plugins {
     id("com.android.library")
     id("kotlin-android")
-    id("kotlin-android-extensions")
     id("kotlin-kapt")
 }
 
@@ -13,10 +12,10 @@ kapt {
 
 android {
     compileSdk = 34
+    namespace = "com.topdon.libapp"
     
     defaultConfig {
         minSdk = 24
-        targetSdk = 34
         
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
