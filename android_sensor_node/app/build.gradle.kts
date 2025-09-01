@@ -114,6 +114,20 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.1")
     implementation("androidx.camera:camera-view:1.3.1")
     
+    // Shimmer GSR Sensor Integration
+    // Note: Using Nordic BLE instead of ShimmerAndroidAPI for now
+    // TODO: Integrate official ShimmerAndroidAPI when available
+    
+    // BLE Support for Shimmer3 GSR+
+    implementation("no.nordicsemi.android:ble:2.6.1")
+    implementation("no.nordicsemi.android:ble-ktx:2.6.1")
+    
+    // CSV file handling for GSR data logging
+    implementation("com.opencsv:opencsv:5.7.1")
+    
+    // Coroutines for async operations
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
     // Test dependencies
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

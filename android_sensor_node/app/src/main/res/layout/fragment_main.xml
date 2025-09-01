@@ -1,148 +1,318 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:background="#16131e">
+    android:fillViewport="true"
+    android:background="#16131e">
 
-    <!-- 未连接过任何设备界面 -->
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/cl_no_device"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="visible"
-        tools:visibility="gone"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
 
+        <!-- Header -->
         <TextView
-            android:id="@+id/tv_no_device_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/top_infrared_up_case"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="@color/white"
-            app:layout_constrainedWidth="true"
-            app:layout_constraintVertical_bias="0.1"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/see_more_than"
-            android:textSize="12sp"
-            android:textColor="@color/white"
-            app:layout_constrainedWidth="true"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tv_no_device_title" />
-
-        <ImageView
-            android:id="@+id/iv_image"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:src="@drawable/ic_main_device_bg_not"
-            android:contentDescription="@null"
-            app:layout_constraintVertical_bias="0.42"
-            app:layout_constraintDimensionRatio="1125:1020"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
-
-        <!-- 连接设备 -->
-        <TextView
-            android:id="@+id/tv_connect_device"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:gravity="center"
-            android:text="@string/tc_connect_device"
-            android:textSize="16sp"
-            android:textColor="#55272f"
-            android:background="@drawable/bg_corners50_solid_theme"
-            app:layout_constraintWidth_percent="0.75"
-            app:layout_constraintDimensionRatio="2825:440"
-            app:layout_constraintVertical_bias="0.3"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/iv_image"
-            app:layout_constraintBottom_toBottomOf="parent" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <!-- 连接过任何设备界面 -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/cl_has_device"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        tools:visibility="visible"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
-
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:src="@drawable/ic_main_device_bg_has"
-            android:contentDescription="@null"
-            app:layout_constraintDimensionRatio="1125:1358"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <ImageView
-            android:id="@+id/iv_add"
-            android:layout_width="62dp"
-            android:layout_height="62dp"
-            android:padding="20dp"
-            android:src="@drawable/svg_main_device_add"
-            android:contentDescription="@null"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <TextView
-            android:id="@+id/tv_has_device_title"
+            android:id="@+id/tv_header"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="20dp"
-            android:layout_marginEnd="20dp"
-            android:text="@string/top_infrared_up_case"
+            android:text="TOPDON INFRARED + GSR"
             android:textSize="24sp"
             android:textStyle="bold"
             android:textColor="@color/white"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"
+            app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/iv_add"
-            app:layout_constraintTop_toTopOf="@id/iv_add"
-            app:layout_constraintBottom_toBottomOf="@id/iv_add" />
+            app:layout_constraintEnd_toEndOf="parent" />
+
         <TextView
-            android:id="@+id/tv_has_device_sub_title"
+            android:id="@+id/tv_subtitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="@string/see_more_than"
-            android:textSize="12sp"
-            android:textColor="@color/white"
-            app:layout_constrainedWidth="true"
-            app:layout_constraintStart_toStartOf="@id/tv_has_device_title"
-            app:layout_constraintEnd_toEndOf="@id/tv_has_device_title"
-            app:layout_constraintTop_toBottomOf="@id/tv_has_device_title" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_marginTop="24dp"
+            android:text="Multi-Modal Physiological Sensing Platform"
+            android:textSize="14sp"
+            android:textColor="#CCFFFFFF"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"
+            app:layout_constraintTop_toBottomOf="@id/tv_header"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tv_has_device_sub_title"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Connection Status Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/card_connection_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#2A2636"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            app:layout_constraintTop_toBottomOf="@id/tv_subtitle"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp">
+
+                <ImageView
+                    android:id="@+id/img_connection_status"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_error"
+                    app:tint="#FF6B6B"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <TextView
+                    android:id="@+id/tv_connection_status"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="No GSR sensor connected"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="12dp"
+                    app:layout_constraintStart_toEndOf="@id/img_connection_status"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="@id/img_connection_status"
+                    app:layout_constraintBottom_toBottomOf="@id/img_connection_status" />
+
+                <TextView
+                    android:id="@+id/tv_recording_status"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Ready to record"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp"
+                    app:layout_constraintStart_toStartOf="@id/img_connection_status"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/tv_connection_status" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Device Discovery Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/card_device_discovery"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#2A2636"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            app:layout_constraintTop_toBottomOf="@id/card_connection_status"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tv_device_discovery_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="GSR Device Discovery"
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <Button
+                    android:id="@+id/btn_scan_devices"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Scan for Shimmer Devices"
+                    android:textColor="@color/white"
+                    android:backgroundTint="#FF6B35"
+                    app:layout_constraintTop_toBottomOf="@id/tv_device_discovery_title"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <ProgressBar
+                    android:id="@+id/progress_connection"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/btn_scan_devices"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <TextView
+                    android:id="@+id/tv_device_status"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Tap scan to discover GSR devices"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp"
+                    app:layout_constraintTop_toBottomOf="@id/progress_connection"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <ListView
+                    android:id="@+id/device_list"
+                    android:layout_width="0dp"
+                    android:layout_height="120dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#1A1824"
+                    android:divider="#3A3644"
+                    android:dividerHeight="1dp"
+                    app:layout_constraintTop_toBottomOf="@id/tv_device_status"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Recording Controls Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/card_recording_controls"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#2A2636"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            app:layout_constraintTop_toBottomOf="@id/card_device_discovery"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tv_recording_controls_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="GSR Recording Controls"
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <Button
+                    android:id="@+id/btn_start_recording"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Start GSR Recording"
+                    android:textColor="@color/white"
+                    android:backgroundTint="#4CAF50"
+                    android:enabled="false"
+                    android:layout_marginEnd="8dp"
+                    app:layout_constraintTop_toBottomOf="@id/tv_recording_controls_title"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/btn_stop_recording" />
+
+                <Button
+                    android:id="@+id/btn_stop_recording"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Stop Recording"
+                    android:textColor="@color/white"
+                    android:backgroundTint="#F44336"
+                    android:enabled="false"
+                    android:layout_marginStart="8dp"
+                    app:layout_constraintTop_toBottomOf="@id/tv_recording_controls_title"
+                    app:layout_constraintStart_toEndOf="@id/btn_start_recording"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <Button
+                    android:id="@+id/btn_disconnect_gsr"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Disconnect GSR Sensor"
+                    android:textColor="@color/white"
+                    android:backgroundTint="#757575"
+                    android:enabled="false"
+                    android:layout_marginTop="8dp"
+                    app:layout_constraintTop_toBottomOf="@id/btn_start_recording"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <TextView
+                    android:id="@+id/tv_session_info"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Session: none"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/btn_disconnect_gsr"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Sensor Information Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/card_sensor_info"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#2A2636"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            app:layout_constraintTop_toBottomOf="@id/card_recording_controls"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tv_sensor_info_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Sensor Information"
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <TextView
+                    android:id="@+id/tv_sensor_info"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="No sensor connected"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="14sp"
+                    android:fontFamily="monospace"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/tv_sensor_info_title"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </androidx.cardview.widget.CardView>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

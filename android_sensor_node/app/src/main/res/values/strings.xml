@@ -12,6 +12,7 @@
     <!-- Permissions -->
     <string name="permission_request_camera_app">%1$s needs camera permission to capture thermal images.</string>
     <string name="permission_request_storage_app">%1$s needs storage permission to save images and videos.</string>
+    <string name="permission_request_ble_app">%1$s needs Bluetooth permissions to connect to GSR sensors.</string>
     
     <!-- Common -->
     <string name="app_confirm">Confirm</string>

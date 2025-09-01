@@ -187,6 +187,23 @@ class MainActivity : BaseActivity(), View.OnClickListener {
         }).let {
             sparseArray.append(R.string.permission_request_storage_app, it)
         }
+        
+        // BLE permissions for GSR sensor
+        val blePermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_ADVERTISE
+            )
+        } else {
+            listOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        }
+        sparseArray.append(R.string.permission_request_ble_app, blePermissions)
+        
         return sparseArray
     }
 
