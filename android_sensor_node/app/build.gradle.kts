@@ -114,13 +114,13 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.1")
     implementation("androidx.camera:camera-view:1.3.1")
     
-    // Shimmer GSR Sensor Integration
-    // Note: Using Nordic BLE instead of ShimmerAndroidAPI for now
-    // TODO: Integrate official ShimmerAndroidAPI when available
-    
-    // BLE Support for Shimmer3 GSR+
+    // GSR Sensor Integration - Enhanced Nordic BLE implementation
+    // Implementing ShimmerAndroidAPI-compatible interface using robust BLE library
     implementation("no.nordicsemi.android:ble:2.6.1")
     implementation("no.nordicsemi.android:ble-ktx:2.6.1")
+    
+    // Additional dependencies for enhanced GSR support
+    implementation("com.google.guava:guava:31.1-android")
     
     // CSV file handling for GSR data logging
     implementation("com.opencsv:opencsv:5.7.1")

@@ -20,11 +20,20 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
     
     <!-- Modern BLE permissions (Android 12+) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    
+    <!-- Required BLE hardware feature -->
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
+        
+    <!-- Wake lock for continuous BLE operation -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     
     <uses-feature
         android:name="android.hardware.usb.host"
@@ -68,6 +77,13 @@
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
         </activity>
+
+        <!-- Shimmer GSR Sensor Device Discovery Dialog -->
+        <activity
+            android:name="com.topdon.tc001.sensors.gsr.shimmer.ShimmerBluetoothDialog"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Dialog"
+            android:screenOrientation="portrait" />
 
     </application>
 
