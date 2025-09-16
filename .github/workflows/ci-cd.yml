@@ -1,336 +1,336 @@
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches: [ main, develop, copilot/* ]
-  pull_request:
-    branches: [ main, develop ]
-
-env:
-  PYTHON_VERSION: '3.12'
-  ANDROID_API_LEVEL: 35
-  ANDROID_BUILD_TOOLS: '35.0.0'
-  # Performance optimizations
-  PIP_CACHE_DIR: ~/.cache/pip
-  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.configureondemand=true -Dorg.gradle.caching=true
-  GRADLE_USER_HOME: ~/.gradle
-
-jobs:
-  # Python Tests Job
-  python-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-
-    - name: Cache Python dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/pip
-          ~/.cache/pre-commit
-          .ruff_cache
-          .mypy_cache
-          .pytest_cache
-        key: ${{ runner.os }}-python-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt', '.pre-commit-config.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-python-
-
-    - name: Install system dependencies for PyQt6
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libgl1-mesa-glx \
-          libegl1-mesa \
-          libxrandr2 \
-          libxss1 \
-          libxcursor1 \
-          libxcomposite1 \
-          libasound2 \
-          libxi6 \
-          libxtst6 \
-          xvfb
-
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r pc_controller/requirements.txt
-        pip install pytest-timeout pytest-xvfb pytest-cov
-
-    - name: Run Python tests with coverage
-      env:
-        DISPLAY: ':99'
-        QT_QPA_PLATFORM: 'offscreen'
-      run: |
-        # Start virtual display
-        Xvfb :99 -screen 0 1024x768x24 &
-
-        # Run tests with coverage
-        python -m pytest pc_controller/tests/ \
-          --cov=pc_controller/src \
-          --cov-report=xml \
-          --cov-report=term-missing \
-          --tb=short \
-          -v
-
-    - name: Upload Python test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: python-test-results
-        path: |
-          .coverage
-          coverage.xml
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      if: always()
-      with:
-        file: ./coverage.xml
-        flags: python-tests
-        name: python-coverage
-
-  # Android Tests Job
-  android-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Cache Gradle dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-          ~/.gradle/buildOutputCleanup
-          ~/.gradle/vcs-1
-          ~/.gradle/build-cache
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-          ${{ runner.os }}-gradle-
-
-    - name: Make gradlew executable
-      run: chmod +x gradlew
-
-    - name: Run Android unit tests
-      run: ./gradlew testDebugUnitTest --console=plain --rerun-tasks
-
-    - name: Upload Android test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: android-test-results
-        path: |
-          android_sensor_node/app/build/reports/tests/testDebugUnitTest/
-          android_sensor_node/app/build/test-results/testDebugUnitTest/
-
-  # Code Quality Job
-  code-quality:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-
-    - name: Install Python linting tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install ruff mypy black isort
-        pip install -r pc_controller/requirements.txt
-
-    - name: Run Python linting (Ruff)
-      run: |
-        ruff check pc_controller/src/ --output-format=github
-
-    - name: Run Python type checking (MyPy)
-      run: |
-        mypy pc_controller/src/ --ignore-missing-imports
-
-    - name: Check Python code formatting (Black)
-      run: |
-        black --check --diff pc_controller/src/
-
-    - name: Check Python import sorting (isort)
-      run: |
-        isort --check-only --diff pc_controller/src/
-
-  # Integration Tests Job
-  integration-tests:
-    runs-on: ubuntu-latest
-    needs: [python-tests, android-tests]
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r pc_controller/requirements.txt
-        pip install pytest-timeout
-
-    - name: Run integration tests
-      env:
-        QT_QPA_PLATFORM: 'offscreen'
-      run: |
-        python -m pytest pc_controller/tests/test_system_end_to_end.py \
-          -v \
-          --tb=short \
-          --timeout=60
-
-    - name: Run heartbeat integration tests
-      env:
-        QT_QPA_PLATFORM: 'offscreen'
-      run: |
-        python -m pytest pc_controller/tests/test_heartbeat_manager.py::TestHeartbeatIntegration \
-          -v \
-          --tb=short \
-          --timeout=30
-
-  # Performance Tests Job
-  performance-tests:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'performance')
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r pc_controller/requirements.txt
-        pip install pytest-benchmark
-
-    - name: Run performance tests
-      env:
-        QT_QPA_PLATFORM: 'offscreen'
-      run: |
-        python scripts/run_performance_test.py --duration=300 --devices=4
-
-    - name: Upload performance results
-      uses: actions/upload-artifact@v4
-      with:
-        name: performance-results
-        path: performance_results.json
-
-  # Security Scan Job
-  security-scan:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Run Bandit security scan
-      run: |
-        pip install bandit[toml]
-        bandit -r pc_controller/src/ -f json -o bandit-report.json
-      continue-on-error: true
-
-    - name: Upload security scan results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-scan-results
-        path: bandit-report.json
-
-  # Build Artifacts Job
-  build-artifacts:
-    runs-on: ubuntu-latest
-    needs: [python-tests, android-tests, code-quality]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-
-    - name: Build PC Controller executable
-      run: |
-        pip install -r pc_controller/requirements.txt
-        ./gradlew :pc_controller:pyInstaller
-
-    - name: Set up JDK for Android build
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Build Android APK
-      run: |
-        chmod +x gradlew
-        ./gradlew android_sensor_node:app:assembleRelease
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-artifacts
-        path: |
-          pc_controller/dist/
-          android_sensor_node/app/build/outputs/apk/release/
-
-  # Deployment Job (only on main branch)
-  deploy:
-    runs-on: ubuntu-latest
-    needs: [build-artifacts]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-artifacts
-
-    - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ github.run_number }}
-        release_name: Release v${{ github.run_number }}
-        body: |
-          Automated release from commit ${{ github.sha }}
-
-          Changes:
-          ${{ github.event.head_commit.message }}
-        draft: false
-        prerelease: false
+#name: CI/CD Pipeline
+#
+#on:
+#  push:
+#    branches: [ main, develop, copilot/* ]
+#  pull_request:
+#    branches: [ main, develop ]
+#
+#env:
+#  PYTHON_VERSION: '3.12'
+#  ANDROID_API_LEVEL: 35
+#  ANDROID_BUILD_TOOLS: '35.0.0'
+#  # Performance optimizations
+#  PIP_CACHE_DIR: ~/.cache/pip
+#  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.configureondemand=true -Dorg.gradle.caching=true
+#  GRADLE_USER_HOME: ~/.gradle
+#
+#jobs:
+#  # Python Tests Job
+#  python-tests:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Set up Python
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: ${{ env.PYTHON_VERSION }}
+#
+#    - name: Cache Python dependencies
+#      uses: actions/cache@v4
+#      with:
+#        path: |
+#          ~/.cache/pip
+#          ~/.cache/pre-commit
+#          .ruff_cache
+#          .mypy_cache
+#          .pytest_cache
+#        key: ${{ runner.os }}-python-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt', '.pre-commit-config.yaml') }}
+#        restore-keys: |
+#          ${{ runner.os }}-python-
+#
+#    - name: Install system dependencies for PyQt6
+#      run: |
+#        sudo apt-get update
+#        sudo apt-get install -y \
+#          libgl1-mesa-glx \
+#          libegl1-mesa \
+#          libxrandr2 \
+#          libxss1 \
+#          libxcursor1 \
+#          libxcomposite1 \
+#          libasound2 \
+#          libxi6 \
+#          libxtst6 \
+#          xvfb
+#
+#    - name: Install Python dependencies
+#      run: |
+#        python -m pip install --upgrade pip
+#        pip install -r pc_controller/requirements.txt
+#        pip install pytest-timeout pytest-xvfb pytest-cov
+#
+#    - name: Run Python tests with coverage
+#      env:
+#        DISPLAY: ':99'
+#        QT_QPA_PLATFORM: 'offscreen'
+#      run: |
+#        # Start virtual display
+#        Xvfb :99 -screen 0 1024x768x24 &
+#
+#        # Run tests with coverage
+#        python -m pytest pc_controller/tests/ \
+#          --cov=pc_controller/src \
+#          --cov-report=xml \
+#          --cov-report=term-missing \
+#          --tb=short \
+#          -v
+#
+#    - name: Upload Python test results
+#      uses: actions/upload-artifact@v4
+#      if: always()
+#      with:
+#        name: python-test-results
+#        path: |
+#          .coverage
+#          coverage.xml
+#
+#    - name: Upload coverage to Codecov
+#      uses: codecov/codecov-action@v5
+#      if: always()
+#      with:
+#        file: ./coverage.xml
+#        flags: python-tests
+#        name: python-coverage
+#
+#  # Android Tests Job
+#  android-tests:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Set up JDK 17
+#      uses: actions/setup-java@v4
+#      with:
+#        java-version: '17'
+#        distribution: 'temurin'
+#
+#    - name: Cache Gradle dependencies
+#      uses: actions/cache@v4
+#      with:
+#        path: |
+#          ~/.gradle/caches
+#          ~/.gradle/wrapper
+#          ~/.gradle/buildOutputCleanup
+#          ~/.gradle/vcs-1
+#          ~/.gradle/build-cache
+#        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle.properties') }}
+#        restore-keys: |
+#          ${{ runner.os }}-gradle-
+#          ${{ runner.os }}-gradle-
+#
+#    - name: Make gradlew executable
+#      run: chmod +x gradlew
+#
+#    - name: Run Android unit tests
+#      run: ./gradlew testDebugUnitTest --console=plain --rerun-tasks
+#
+#    - name: Upload Android test results
+#      uses: actions/upload-artifact@v4
+#      if: always()
+#      with:
+#        name: android-test-results
+#        path: |
+#          android_sensor_node/app/build/reports/tests/testDebugUnitTest/
+#          android_sensor_node/app/build/test-results/testDebugUnitTest/
+#
+#  # Code Quality Job
+#  code-quality:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Set up Python
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: ${{ env.PYTHON_VERSION }}
+#
+#    - name: Install Python linting tools
+#      run: |
+#        python -m pip install --upgrade pip
+#        pip install ruff mypy black isort
+#        pip install -r pc_controller/requirements.txt
+#
+#    - name: Run Python linting (Ruff)
+#      run: |
+#        ruff check pc_controller/src/ --output-format=github
+#
+#    - name: Run Python type checking (MyPy)
+#      run: |
+#        mypy pc_controller/src/ --ignore-missing-imports
+#
+#    - name: Check Python code formatting (Black)
+#      run: |
+#        black --check --diff pc_controller/src/
+#
+#    - name: Check Python import sorting (isort)
+#      run: |
+#        isort --check-only --diff pc_controller/src/
+#
+#  # Integration Tests Job
+#  integration-tests:
+#    runs-on: ubuntu-latest
+#    needs: [python-tests, android-tests]
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Set up Python
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: ${{ env.PYTHON_VERSION }}
+#
+#    - name: Install dependencies
+#      run: |
+#        python -m pip install --upgrade pip
+#        pip install -r pc_controller/requirements.txt
+#        pip install pytest-timeout
+#
+#    - name: Run integration tests
+#      env:
+#        QT_QPA_PLATFORM: 'offscreen'
+#      run: |
+#        python -m pytest pc_controller/tests/test_system_end_to_end.py \
+#          -v \
+#          --tb=short \
+#          --timeout=60
+#
+#    - name: Run heartbeat integration tests
+#      env:
+#        QT_QPA_PLATFORM: 'offscreen'
+#      run: |
+#        python -m pytest pc_controller/tests/test_heartbeat_manager.py::TestHeartbeatIntegration \
+#          -v \
+#          --tb=short \
+#          --timeout=30
+#
+#  # Performance Tests Job
+#  performance-tests:
+#    runs-on: ubuntu-latest
+#    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'performance')
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Set up Python
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: ${{ env.PYTHON_VERSION }}
+#
+#    - name: Install dependencies
+#      run: |
+#        python -m pip install --upgrade pip
+#        pip install -r pc_controller/requirements.txt
+#        pip install pytest-benchmark
+#
+#    - name: Run performance tests
+#      env:
+#        QT_QPA_PLATFORM: 'offscreen'
+#      run: |
+#        python scripts/run_performance_test.py --duration=300 --devices=4
+#
+#    - name: Upload performance results
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: performance-results
+#        path: performance_results.json
+#
+#  # Security Scan Job
+#  security-scan:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Run Bandit security scan
+#      run: |
+#        pip install bandit[toml]
+#        bandit -r pc_controller/src/ -f json -o bandit-report.json
+#      continue-on-error: true
+#
+#    - name: Upload security scan results
+#      uses: actions/upload-artifact@v4
+#      if: always()
+#      with:
+#        name: security-scan-results
+#        path: bandit-report.json
+#
+#  # Build Artifacts Job
+#  build-artifacts:
+#    runs-on: ubuntu-latest
+#    needs: [python-tests, android-tests, code-quality]
+#    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Set up Python
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: ${{ env.PYTHON_VERSION }}
+#
+#    - name: Build PC Controller executable
+#      run: |
+#        pip install -r pc_controller/requirements.txt
+#        ./gradlew :pc_controller:pyInstaller
+#
+#    - name: Set up JDK for Android build
+#      uses: actions/setup-java@v4
+#      with:
+#        java-version: '17'
+#        distribution: 'temurin'
+#
+#    - name: Build Android APK
+#      run: |
+#        chmod +x gradlew
+#        ./gradlew android_sensor_node:app:assembleRelease
+#
+#    - name: Upload build artifacts
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: build-artifacts
+#        path: |
+#          pc_controller/dist/
+#          android_sensor_node/app/build/outputs/apk/release/
+#
+#  # Deployment Job (only on main branch)
+#  deploy:
+#    runs-on: ubuntu-latest
+#    needs: [build-artifacts]
+#    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+#    environment: production
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Download build artifacts
+#      uses: actions/download-artifact@v4
+#      with:
+#        name: build-artifacts
+#
+#    - name: Create GitHub Release
+#      uses: actions/create-release@v1
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      with:
+#        tag_name: v${{ github.run_number }}
+#        release_name: Release v${{ github.run_number }}
+#        body: |
+#          Automated release from commit ${{ github.sha }}
+#
+#          Changes:
+#          ${{ github.event.head_commit.message }}
+#        draft: false
+#        prerelease: false
