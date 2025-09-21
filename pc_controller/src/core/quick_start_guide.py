@@ -23,7 +23,6 @@ try:
 except ImportError:
     _QT_AVAILABLE = False
 
-    # Create stub classes for testing environment
     class QDialog:  # type: ignore[no-redef]
         class DialogCode:
             Accepted = 1
@@ -234,7 +233,6 @@ class QuickStartGuide(QDialog):
         """Set up the dialog UI."""
         layout = QVBoxLayout(self)
 
-        # Header with progress
         header_layout = QHBoxLayout()
 
         self.progress_bar = QProgressBar()
@@ -252,13 +250,11 @@ class QuickStartGuide(QDialog):
 
         layout.addLayout(header_layout)
 
-        # Add separator line
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(separator)
 
-        # Content area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(
@@ -283,14 +279,13 @@ class QuickStartGuide(QDialog):
 
         # Action button (optional)
         self.action_button = QPushButton()
-        self.action_button.hide()  # Hidden by default
+        self.action_button.hide()
         self.action_button.clicked.connect(self._on_action_clicked)
         self.content_layout.addWidget(self.action_button)
 
         self.scroll_area.setWidget(self.content_widget)
         layout.addWidget(self.scroll_area)
 
-        # Navigation buttons
         nav_layout = QHBoxLayout()
 
         self.skip_button = QPushButton("Skip Tutorial")
@@ -323,22 +318,18 @@ class QuickStartGuide(QDialog):
         step = self.steps[step_index]
         self.current_step = step_index
 
-        # Update progress
         self.progress_bar.setValue(step_index + 1)
         self.step_label.setText(f"Step {step_index + 1} of {len(self.steps)}")
 
-        # Update content
         self.title_label.setText(step.title)
         self.content_text.setHtml(step.content)
 
-        # Update action button
         if step.action_text and step.action_callback:
             self.action_button.setText(step.action_text)
             self.action_button.show()
         else:
             self.action_button.hide()
 
-        # Update navigation buttons
         self.prev_button.setEnabled(step_index > 0)
         self.skip_button.setVisible(step.skip_allowed)
 
@@ -375,7 +366,6 @@ class QuickStartGuide(QDialog):
         if step.action_callback:
             step.action_callback()
 
-    # Demo/test action callbacks
     def _test_network_discovery(self):
         """Demo network discovery testing."""
         from PyQt6.QtWidgets import QMessageBox
@@ -455,7 +445,6 @@ class FirstTimeSetupWizard:
 
     def should_show_tutorial(self) -> bool:
         """Check if tutorial should be shown to the user."""
-        # Check if user has completed tutorial before
         return not self.settings.get_boolean("tutorial_completed", False)
 
     def show_tutorial_if_needed(self, parent_widget) -> bool:
@@ -469,11 +458,9 @@ class FirstTimeSetupWizard:
         self._tutorial_shown = True
         tutorial = QuickStartGuide(parent_widget)
 
-        # Connect signals
         tutorial.tutorial_completed.connect(self._on_tutorial_completed)
         tutorial.tutorial_skipped.connect(self._on_tutorial_skipped)
 
-        # Show dialog
         result = tutorial.exec()
         return result == QDialog.DialogCode.Accepted
 
@@ -494,7 +481,6 @@ class FirstTimeSetupWizard:
     def _on_tutorial_skipped(self):
         """Handle tutorial being skipped."""
         self.settings.set_boolean("tutorial_skipped", True)
-        # Don't mark as completed so it can be accessed later
 
     def show_tutorial_on_demand(self, parent_widget):
         """Show tutorial when explicitly requested by user."""
@@ -502,18 +488,14 @@ class FirstTimeSetupWizard:
         tutorial.exec()
 
 
-# Integration helper functions for main application
 def integrate_quick_start_guide(gui_manager, settings_manager):
     """Integrate quick start guide into the main GUI manager."""
 
-    # Create first-time setup wizard
     setup_wizard = FirstTimeSetupWizard(settings_manager)
 
-    # Show tutorial if needed (e.g., on application startup)
     def show_tutorial_if_first_time():
         setup_wizard.show_tutorial_if_needed(gui_manager)
 
-    # Add menu item for on-demand tutorial
     def show_tutorial_on_demand():
         setup_wizard.show_tutorial_on_demand(gui_manager)
 

@@ -39,24 +39,21 @@ class ShimmerManager(
 ) {
     companion object {
         private const val TAG = "ShimmerManager"
-        private const val SCAN_TIMEOUT_MS = 10000L // 10 seconds
+        private const val SCAN_TIMEOUT_MS = 10000L
         private const val RECONNECTION_ATTEMPTS = 3
-        private const val RECONNECTION_DELAY_MS = 2000L // 2 seconds
-        private const val CONNECTION_TIMEOUT_MS = 15000L // 15 seconds
+        private const val RECONNECTION_DELAY_MS = 2000L
+        private const val CONNECTION_TIMEOUT_MS = 15000L
     }
 
-    // BLE management
     private var bleManager: BleManager? = null
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var currentShimmerDevice: Shimmer3BLEAndroid? = null
     private var connectedBleDevice: BleDevice? = null
     
-    // Coroutine management
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var scanningJob: Job? = null
     private var reconnectionJob: Job? = null
     
-    // Connection state management
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
@@ -66,7 +63,6 @@ class ShimmerManager(
     private val _dataRate = MutableStateFlow(0.0)
     val dataRate: StateFlow<Double> = _dataRate.asStateFlow()
 
-    // Scanning state
     private val _discoveredDevices = MutableStateFlow<List<ShimmerDeviceInfo>>(emptyList())
     val discoveredDevices: StateFlow<List<ShimmerDeviceInfo>> = _discoveredDevices.asStateFlow()
 
@@ -112,7 +108,6 @@ class ShimmerManager(
                 return false
             }
 
-            // Initialize Bluetooth adapter
             val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
             bluetoothAdapter = bluetoothManager.adapter
 
@@ -127,7 +122,6 @@ class ShimmerManager(
                 return false
             }
 
-            // Initialize BLE manager
             BleManager.getInstance().init(context.applicationContext as android.app.Application)
             BleManager.getInstance()
                 .enableLog(true)
@@ -168,7 +162,6 @@ class ShimmerManager(
         _connectionState.value = ConnectionState.SCANNING
         _discoveredDevices.value = emptyList()
 
-        // Start scanning with timeout
         scanningJob = scope.launch {
             try {
                 performBleScan()
@@ -185,7 +178,6 @@ class ShimmerManager(
     private suspend fun performBleScan() {
         val discoveredDevicesList = mutableListOf<ShimmerDeviceInfo>()
         
-        // First, add already paired Shimmer devices
         bluetoothAdapter?.bondedDevices?.forEach { device ->
             if (isShimmerDevice(device.name)) {
                 val deviceInfo = ShimmerDeviceInfo(
@@ -199,10 +191,8 @@ class ShimmerManager(
             }
         }
 
-        // Update UI with paired devices immediately
         _discoveredDevices.value = discoveredDevicesList.toList()
 
-        // Start BLE scan for unpaired devices
         bleManager?.scan(object : BleScanCallback() {
             override fun onScanStarted(success: Boolean) {
                 Log.d(TAG, "BLE scan started: $success")
@@ -231,7 +221,6 @@ class ShimmerManager(
                         isPaired = bluetoothAdapter?.bondedDevices?.contains(device) == true
                     )
 
-                    // Only add if not already in list
                     if (!discoveredDevicesList.any { it.address == device.address }) {
                         discoveredDevicesList.add(deviceInfo)
                         _discoveredDevices.value = discoveredDevicesList.toList()
@@ -241,7 +230,6 @@ class ShimmerManager(
             }
 
             override fun onScanning(bleDevice: BleDevice) {
-                // Continue scanning
             }
 
             override fun onScanFinished(scanResultList: List<BleDevice>) {
@@ -254,7 +242,6 @@ class ShimmerManager(
             }
         })
 
-        // Stop scanning after timeout
         delay(SCAN_TIMEOUT_MS)
         if (scope.isActive) {
             bleManager?.cancelScan()
@@ -308,7 +295,6 @@ class ShimmerManager(
             }
         }
 
-        // All attempts failed
         Log.w(TAG, "Failed to connect after $RECONNECTION_ATTEMPTS attempts, falling back to simulation")
         fallbackToSimulation(deviceAddress)
     }
@@ -316,29 +302,25 @@ class ShimmerManager(
     @SuppressLint("MissingPermission")
     private suspend fun performConnection(deviceAddress: String): Boolean {
         return try {
-            // Create Shimmer3BLE instance
             val shimmerDevice = Shimmer3BLEAndroid(
                 deviceAddress,
                 android.os.Handler(android.os.Looper.getMainLooper()),
                 context
             )
 
-            // Set up connection callbacks and start connection
             shimmerDevice.connect(deviceAddress, "Shimmer GSR")
             
-            // Wait for connection to complete (simplified for this implementation)
             delay(5000)
             
             currentShimmerDevice = shimmerDevice
             _connectionState.value = ConnectionState.CONNECTED
             
-            // Update device info
             _deviceInfo.value = ShimmerDeviceInfo(
                 deviceId = deviceAddress,
                 name = "Shimmer GSR",
                 address = deviceAddress,
-                batteryLevel = 85, // Would be read from device
-                firmwareVersion = "3.0.0", // Would be read from device
+                batteryLevel = 85,
+                firmwareVersion = "3.0.0",
                 isSimulated = false
             )
 
@@ -365,7 +347,7 @@ class ShimmerManager(
                 shimmer.startStreaming()
                 
                 _connectionState.value = ConnectionState.STREAMING
-                _dataRate.value = 128.0 // Target sampling rate
+                _dataRate.value = 128.0
                 
                 Log.i(TAG, "Started streaming from Shimmer device")
                 true
@@ -400,16 +382,13 @@ class ShimmerManager(
         Log.i(TAG, "Disconnecting from Shimmer device")
         
         try {
-            // Cancel any ongoing operations
             scanningJob?.cancel()
             reconnectionJob?.cancel()
             
-            // Stop streaming if active
             if (_connectionState.value == ConnectionState.STREAMING) {
                 stopStreaming()
             }
             
-            // Disconnect from device
             currentShimmerDevice?.disconnect()
             currentShimmerDevice = null
             connectedBleDevice = null
@@ -464,7 +443,6 @@ class ShimmerManager(
             isSimulated = true
         )
         
-        // Simulate data streaming
         _dataRate.value = 128.0
     }
 

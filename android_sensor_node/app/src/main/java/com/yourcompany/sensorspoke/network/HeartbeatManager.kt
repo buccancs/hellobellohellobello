@@ -22,9 +22,9 @@ class HeartbeatManager(
     private val context: Context,
     private val deviceId: String,
     private val networkClient: NetworkClient,
-    private val heartbeatIntervalMs: Long = 3000L, // 3 seconds
+    private val heartbeatIntervalMs: Long = 3000L,
     private val maxReconnectAttempts: Int = 10,
-    private val reconnectBackoffMs: Long = 5000L, // 5 seconds
+    private val reconnectBackoffMs: Long = 5000L,
 ) {
     companion object {
         private const val TAG = "HeartbeatManager"
@@ -39,7 +39,6 @@ class HeartbeatManager(
     private val reconnectAttempts = AtomicInteger(0)
     private val lastHeartbeatTime = AtomicLong(0)
 
-    // Callbacks for connection state changes
     var onConnectionLost: (() -> Unit)? = null
     var onConnectionRestored: (() -> Unit)? = null
     var onMaxReconnectAttemptsReached: (() -> Unit)? = null
@@ -90,7 +89,6 @@ class HeartbeatManager(
             Log.w(TAG, "Connection lost for device: $deviceId")
             onConnectionLost?.invoke()
 
-            // Start reconnection attempts
             scheduleReconnectAttempt()
         }
     }
@@ -104,7 +102,6 @@ class HeartbeatManager(
             reconnectAttempts.set(0)
             onConnectionRestored?.invoke()
 
-            // Resume normal heartbeats
             if (isRunning.get()) {
                 scheduleNextHeartbeat()
             }
@@ -138,7 +135,7 @@ class HeartbeatManager(
             Runnable {
                 if (isRunning.get() && isConnected.get()) {
                     sendHeartbeat()
-                    scheduleNextHeartbeat() // Schedule next heartbeat
+                    scheduleNextHeartbeat()
                 }
             }
 
@@ -149,13 +146,11 @@ class HeartbeatManager(
         try {
             val metadata =
                 mutableMapOf<String, Any>().apply {
-                    // Add device status information
                     put("battery_level", getBatteryLevel())
                     put("recording_active", isRecordingActive())
                     put("storage_available_mb", getAvailableStorageMB())
                     put("uptime_ms", getUptimeMs())
 
-                    // Add any additional metadata
                     additionalMetadata?.let { putAll(it) }
                 }
 
@@ -200,7 +195,6 @@ class HeartbeatManager(
             if (networkClient.reconnect()) {
                 markConnectionRestored()
             } else {
-                // Schedule next attempt
                 scheduleReconnectAttempt()
             }
         } catch (e: Exception) {
@@ -236,7 +230,7 @@ class HeartbeatManager(
             batteryManager.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to get battery level", e)
-            -1 // Unknown
+            -1
         }
 
     /**
@@ -244,7 +238,6 @@ class HeartbeatManager(
      */
     private fun isRecordingActive(): Boolean =
         try {
-            // Check if RecordingService is running
             val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
             activityManager.getRunningServices(Integer.MAX_VALUE).any { serviceInfo ->
                 serviceInfo.service.className.contains("RecordingService")
@@ -261,10 +254,10 @@ class HeartbeatManager(
         try {
             val statsFs = android.os.StatFs(context.filesDir.path)
             val availableBytes = statsFs.availableBytes
-            availableBytes / (1024 * 1024) // Convert to MB
+            availableBytes / (1024 * 1024)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to get storage info", e)
-            -1L // Unknown
+            -1L
         }
 
     /**

@@ -18,21 +18,17 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-# Phase 1
 QUERY_CMD_ID = 1
 COMMAND_QUERY_CAPABILITIES = "query_capabilities"
 
-# Phase 4 commands
 COMMAND_START_RECORDING = "start_recording"
 COMMAND_STOP_RECORDING = "stop_recording"
 COMMAND_FLASH_SYNC = "flash_sync"
 COMMAND_TIME_SYNC = "time_sync"
 COMMAND_PREVIEW_REQUEST = "preview_request"
 
-# Phase 5 command
 COMMAND_TRANSFER_FILES = "transfer_files"
 
-# Rejoin/Recovery (FR8)
 COMMAND_REJOIN_SESSION = "rejoin_session"
 
 V1 = 1
@@ -51,7 +47,6 @@ def build_query_capabilities(cmd_id: int | None = None) -> str:
     return json.dumps(payload) + "\n"
 
 
-# ---------- Phase 5: length-prefixed framing utilities ----------
 
 
 def encode_frame(obj: dict[str, Any]) -> bytes:
@@ -82,25 +77,23 @@ def decode_frames(buffer: bytes) -> DecodeResult:
     i = 0
     n = len(buffer)
     while True:
-        # Find newline separating length and payload
         j = buffer.find(b"\n", i)
         if j == -1:
-            break  # Need more data
+            break
         length_field = buffer[i:j]
         if not length_field.isdigit():
-            break  # Not length-prefixed framing at this position
+            break
         length = int(length_field)
         start = j + 1
         end = start + length
         if end > n:
-            break  # Incomplete payload
+            break
         payload_bytes = buffer[start:end]
         try:
             msg = json.loads(payload_bytes.decode("utf-8"))
             if isinstance(msg, dict):
                 msgs.append(msg)
         except Exception:
-            # Skip malformed frame; move pointer past this frame
             pass
         i = end
         if i >= n:
@@ -109,7 +102,6 @@ def decode_frames(buffer: bytes) -> DecodeResult:
     return DecodeResult(messages=msgs, remainder=remainder)
 
 
-# ---------- Phase 5: v=1 message builders ----------
 
 
 def build_v1_cmd(command: str, msg_id: int, **kwargs: Any) -> dict[str, Any]:
@@ -162,7 +154,6 @@ def build_v1_error(ack_id: int, code: str, message: str) -> dict[str, Any]:
     }
 
 
-# ---------- Legacy helpers kept for backward compatibility ----------
 
 
 def build_start_recording(session_id: str, msg_id: int) -> str:
@@ -215,7 +206,6 @@ def parse_json_line(line: str) -> dict[str, Any]:
     try:
         return json.loads(line)
     except Exception:
-        # Safe evaluation of Python literals as a fallback for tests
         obj = ast.literal_eval(line)
         if not isinstance(obj, dict):
             raise ValueError("Parsed object is not a dict") from None
@@ -263,28 +253,23 @@ def compute_time_sync_stats(
     n = min(len(offsets), len(delays))
     if n == 0:
         return 0, 0, 0, 0
-    # Sort copies for trimming
     so = sorted(offsets[:n])
-    # Determine trim count per side
     trim_ratio = max(0.0, min(0.45, float(trim_ratio)))
     k = round(n * trim_ratio)
     if k * 2 >= n:
         k = max(0, (n - 1) // 2)
     trimmed = so[k : n - k] if k > 0 else so
-    # Median
     m_idx = len(trimmed) // 2
     if len(trimmed) % 2 == 1:
         median_offset = int(trimmed[m_idx])
     else:
         median_offset = int((trimmed[m_idx - 1] + trimmed[m_idx]) // 2)
-    # Std dev (population) on trimmed offsets
     if len(trimmed) <= 1:
         std_dev = 0
     else:
         mu = sum(trimmed) / float(len(trimmed))
         var = sum((x - mu) ** 2 for x in trimmed) / float(len(trimmed))
         std_dev = round(var**0.5)
-    # Min delay from all trials (not trimmed)
     min_delay = int(min(delays[:n]))
     return int(median_offset), int(min_delay), int(std_dev), len(trimmed)
 

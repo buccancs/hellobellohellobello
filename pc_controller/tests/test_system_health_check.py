@@ -34,7 +34,7 @@ class TestSystemHealthChecker:
         assert result.component == "Test Component"
         assert result.status == "pass"
         assert result.message == "Test passed successfully"
-        assert result.timestamp  # Should be automatically set
+        assert result.timestamp
 
     def test_system_health_report_creation(self):
         """Test SystemHealthReport dataclass creation."""
@@ -45,14 +45,14 @@ class TestSystemHealthChecker:
 
         report = SystemHealthReport(
             overall_status="warning",
-            check_timestamp="",  # Will be auto-set
+            check_timestamp="",
             system_info={"platform": "test"},
             check_results=results,
             recommendations=["Fix minor issue"]
         )
 
         assert report.overall_status == "warning"
-        assert report.check_timestamp  # Should be automatically set
+        assert report.check_timestamp
         assert len(report.check_results) == 2
 
     @pytest.mark.asyncio
@@ -60,7 +60,6 @@ class TestSystemHealthChecker:
         """Test system information collection."""
         system_info = health_checker._collect_system_info()
 
-        # Should include basic system information
         required_keys = [
             "platform", "system", "python_version",
             "hostname", "cpu_count", "memory_total_gb"
@@ -155,7 +154,6 @@ class TestSystemHealthChecker:
 
     def test_determine_overall_status(self, health_checker):
         """Test overall status determination."""
-        # All pass
         results_pass = [
             HealthCheckResult("Test1", "pass", "OK"),
             HealthCheckResult("Test2", "pass", "OK")
@@ -177,7 +175,6 @@ class TestSystemHealthChecker:
         ]
         assert health_checker._determine_overall_status(results_many_warnings) == "warning"
 
-        # Some failures
         results_fail = [
             HealthCheckResult("Test1", "pass", "OK"),
             HealthCheckResult("Test2", "fail", "Critical issue")
@@ -198,7 +195,6 @@ class TestSystemHealthChecker:
         recommendations = health_checker._generate_recommendations(results)
 
         assert len(recommendations) > 0
-        # Check for expected recommendation types
         memory_rec = any("memory" in rec.lower() for rec in recommendations)
         network_rec = any("network" in rec.lower() for rec in recommendations)
         deps_rec = any("dependencies" in rec.lower() for rec in recommendations)
@@ -212,13 +208,12 @@ class TestSystemHealthChecker:
 
         assert isinstance(report, SystemHealthReport)
         assert report.overall_status in ["healthy", "warning", "critical"]
-        assert len(report.check_results) >= 6  # Should have multiple checks
+        assert len(report.check_results) >= 6
         assert isinstance(report.system_info, dict)
         assert isinstance(report.recommendations, list)
 
     def test_save_report(self, health_checker):
         """Test report saving functionality."""
-        # Create a test report
         results = [HealthCheckResult("Test", "pass", "OK")]
         report = SystemHealthReport(
             overall_status="healthy",
@@ -235,7 +230,6 @@ class TestSystemHealthChecker:
         try:
             health_checker.save_report(report, tmp_path)
 
-            # Verify file was created and contains expected data
             assert tmp_path.exists()
 
             with open(tmp_path) as f:
@@ -246,16 +240,12 @@ class TestSystemHealthChecker:
             assert saved_data["system_info"]["test"] is True
 
         finally:
-            # Clean up
             tmp_path.unlink(missing_ok=True)
 
     @pytest.mark.asyncio
     async def test_emit_progress(self, health_checker):
         """Test progress emission (basic functionality)."""
-        # This test just ensures the method doesn't crash
-        # In a real GUI environment, you'd test the signal emission
         health_checker.emit_progress(50, "Test progress")
-        # Should not raise any exceptions
 
 
 class TestIntegration:
@@ -266,7 +256,6 @@ class TestIntegration:
         """Test health check with simulated system issues."""
         checker = SystemHealthChecker()
 
-        # Mock some checks to return failures
         async def mock_failing_check():
             return HealthCheckResult(
                 component="Mock Component",
@@ -275,20 +264,17 @@ class TestIntegration:
                 details={"issues": ["Mock issue"]}
             )
 
-        # Replace one check with failing mock
         original_check = checker._check_hardware_connectivity
         checker._check_hardware_connectivity = mock_failing_check
 
         try:
             report = await checker.run_comprehensive_health_check()
 
-            # Should detect the failure
             assert report.overall_status == "critical"
             assert any(r.status == "fail" for r in report.check_results)
             assert len(report.recommendations) > 0
 
         finally:
-            # Restore original method
             checker._check_hardware_connectivity = original_check
 
 

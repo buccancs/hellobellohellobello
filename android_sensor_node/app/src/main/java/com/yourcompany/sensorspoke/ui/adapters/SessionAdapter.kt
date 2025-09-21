@@ -5,7 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-// R import handled automatically
+import com.yourcompany.sensorspoke.R
 import com.yourcompany.sensorspoke.ui.models.SessionInfo
 import java.text.SimpleDateFormat
 import java.util.Locale

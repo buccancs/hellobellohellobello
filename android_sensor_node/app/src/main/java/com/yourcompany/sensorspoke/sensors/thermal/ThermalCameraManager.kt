@@ -4,10 +4,18 @@ import android.content.Context
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.util.Log
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.yourcompany.sensorspoke.utils.PermissionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * ThermalCameraManager handles thermal camera lifecycle management and configuration.
@@ -25,14 +33,13 @@ class ThermalCameraManager(
 ) {
     companion object {
         private const val TAG = "ThermalCameraManager"
-        private const val TOPDON_VENDOR_ID = 0x4d54 // Topdon TC001 vendor ID
-        private const val TC001_PRODUCT_ID_1 = 0x0100 // TC001 product ID variant 1
-        private const val TC001_PRODUCT_ID_2 = 0x0200 // TC001 product ID variant 2
-        private const val DEFAULT_FPS = 10 // Default 10 FPS for simulation
-        private const val MAX_FPS = 25 // Maximum 25 Hz as per Topdon capability
+        private const val TOPDON_VENDOR_ID = 0x4d54
+        private const val TC001_PRODUCT_ID_1 = 0x0100
+        private const val TC001_PRODUCT_ID_2 = 0x0200
+        private const val DEFAULT_FPS = 10
+        private const val MAX_FPS = 25
     }
 
-    // Camera state management
     private val _cameraState = MutableStateFlow(CameraState.UNINITIALIZED)
     val cameraState: StateFlow<CameraState> = _cameraState.asStateFlow()
 
@@ -42,9 +49,11 @@ class ThermalCameraManager(
     private val _frameRate = MutableStateFlow(DEFAULT_FPS.toDouble())
     val frameRate: StateFlow<Double> = _frameRate.asStateFlow()
 
-    // Camera integration components
     private var realTopdonIntegration: RealTopdonIntegration? = null
+    private var topdonIntegration: TopdonThermalIntegration? = null
     private var targetFps = DEFAULT_FPS
+    
+    private val managerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     /**
      * Camera states for thermal camera management
@@ -98,7 +107,6 @@ class ThermalCameraManager(
             val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
             val deviceList = usbManager.deviceList
 
-            // Look for Topdon TC001 device
             val topdonDevice = deviceList.values.find { device ->
                 isTopdonTC001Device(device)
             }
@@ -106,7 +114,6 @@ class ThermalCameraManager(
             if (topdonDevice != null) {
                 Log.i(TAG, "Topdon TC001 device found: ${topdonDevice.deviceName}")
 
-                // Request USB permissions if needed
                 val hasPermission = checkUsbPermission(topdonDevice, usbManager)
                 if (hasPermission) {
                     Log.i(TAG, "USB permission granted, initializing real Topdon integration")
@@ -132,7 +139,6 @@ class ThermalCameraManager(
         try {
             realTopdonIntegration = RealTopdonIntegration(context)
             
-            // Use coroutine scope to call suspend function
             managerScope.launch {
                 val success = realTopdonIntegration!!.initialize()
                 
@@ -218,7 +224,6 @@ class ThermalCameraManager(
             true
         } else {
             Log.i(TAG, "USB permission required for Topdon TC001")
-            // In a real implementation, request permission asynchronously
             false
         }
     }
@@ -269,14 +274,14 @@ class ThermalCameraManager(
     fun cleanup() {
         Log.i(TAG, "Cleaning up thermal camera manager")
 
-        // Clean up real integration
-        realTopdonIntegration?.let {
-            it.stopStreaming()
-            it.disconnect()
+        realTopdonIntegration?.let { integration ->
+            managerScope.launch {
+                integration.stopStreaming()
+                integration.disconnect()
+            }
             realTopdonIntegration = null
         }
 
-        // Clean up simulation integration
         topdonIntegration?.let {
             it.disconnect()
             it.cleanup()
@@ -288,3 +293,155 @@ class ThermalCameraManager(
         _frameRate.value = DEFAULT_FPS.toDouble()
     }
 }
+
+/**
+ * TC001UIController - Enhanced thermal camera UI management
+ * 
+ * Integrated into ThermalCameraManager for centralized thermal camera control
+ * Manages thermal camera UI state and controls based on IRCamera's comprehensive interface design
+ */
+class TC001UIController : ViewModel() {
+    companion object {
+        private const val TAG = "TC001UIController"
+    }
+
+    private val _isRecording = MutableLiveData(false)
+    val isRecording: LiveData<Boolean> = _isRecording
+
+    private val _currentPalette = MutableLiveData(TopdonThermalPalette.GRAYSCALE)
+    val currentPalette: LiveData<TopdonThermalPalette> = _currentPalette
+
+    private val _deviceStatus = MutableLiveData<TC001DeviceStatus?>(null)
+    val deviceStatus: LiveData<TC001DeviceStatus?> = _deviceStatus
+
+    private val _deviceConnectionStatus = MutableLiveData(false)
+    val deviceConnectionStatus: LiveData<Boolean> = _deviceConnectionStatus
+
+    private val _currentTemperature = MutableLiveData<Float?>(null)
+    val currentTemperature: LiveData<Float?> = _currentTemperature
+
+    /**
+     * Update device connection status
+     */
+    fun updateDeviceConnection(connected: Boolean) {
+        _deviceConnectionStatus.value = connected
+        Log.i(TAG, "Device connection updated: $connected")
+    }
+
+    /**
+     * Update current temperature reading
+     */
+    fun updateCurrentTemperature(temperature: Float) {
+        _currentTemperature.value = temperature
+        Log.d(TAG, "Temperature updated: $temperature°C")
+    }
+
+    /**
+     * Start thermal recording
+     */
+    fun startRecording() {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Starting thermal recording")
+                _isRecording.value = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start recording", e)
+            }
+        }
+    }
+
+    /**
+     * Stop thermal recording
+     */
+    fun stopRecording() {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Stopping thermal recording")
+                _isRecording.value = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop recording", e)
+            }
+        }
+    }
+
+    /**
+     * Update thermal palette
+     */
+    fun updatePalette(palette: TopdonThermalPalette) {
+        _currentPalette.value = palette
+        Log.i(TAG, "Updated thermal palette to: $palette")
+    }
+
+    /**
+     * Update device connection status
+     */
+    fun updateDeviceStatus(status: TC001DeviceStatus) {
+        _deviceStatus.value = status
+        Log.i(TAG, "Updated device status: $status")
+    }
+
+    /**
+     * Handle auto gain toggle
+     */
+    fun onAutoGainToggled(enabled: Boolean) {
+        Log.i(TAG, "Auto gain toggled: $enabled")
+        // Implementation for auto gain control
+    }
+
+    /**
+     * Handle temperature compensation toggle
+     */
+    fun onTemperatureCompensationToggled(enabled: Boolean) {
+        Log.i(TAG, "Temperature compensation toggled: $enabled")
+        // Implementation for temperature compensation control
+    }
+
+    // Additional UI controller methods for EnhancedMainFragment integration
+    
+    private val _hasConnectLine = MutableLiveData(false)
+    val hasConnectLine: LiveData<Boolean> = _hasConnectLine
+
+    /**
+     * Handle device click events
+     */
+    fun handleDeviceClick(deviceType: Any) {
+        Log.i(TAG, "Device clicked: $deviceType")
+        // Handle device selection/interaction
+    }
+
+    /**
+     * Refresh UI state
+     */
+    fun refresh() {
+        Log.d(TAG, "Refreshing UI state")
+        // Refresh device list and connection status
+    }
+
+    /**
+     * Update connection status
+     */
+    fun updateConnectionStatus(connected: Boolean) {
+        _deviceConnectionStatus.value = connected
+        Log.i(TAG, "Connection status updated: $connected")
+    }
+}
+
+/**
+ * TC001 connection types (adapted from IRCamera)
+ */
+enum class TC001ConnectType {
+    LINE,
+    WIFI,
+    BLE,
+}
+
+/**
+ * Device information for connected TC001
+ */
+data class TC001DeviceStatus(
+    val isConnected: Boolean,
+    val deviceName: String,
+    val connectionType: TC001ConnectType,
+    val batteryLevel: Int? = null,
+    val temperature: Float? = null,
+)

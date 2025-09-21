@@ -48,13 +48,11 @@ class PermissionManager(
         private const val TAG = "PermissionManager"
         private const val ACTION_USB_PERMISSION = "com.yourcompany.sensorspoke.USB_PERMISSION"
 
-        // Topdon TC001 Hardware identifiers
         private const val TOPDON_VENDOR_ID = 0x4d54
         private const val TC001_PRODUCT_ID_1 = 0x0100
         private const val TC001_PRODUCT_ID_2 = 0x0200
     }
 
-    // Permission groups for different sensor types with enhanced API compatibility
     private val cameraPermissions = arrayOf(
         Manifest.permission.CAMERA,
         Manifest.permission.RECORD_AUDIO,
@@ -87,7 +85,6 @@ class PermissionManager(
         )
     }
 
-    // Enhanced activity result launchers with retry tracking
     private val cameraPermissionLauncher = activity.registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { permissions ->
@@ -106,7 +103,6 @@ class PermissionManager(
         handlePermissionResult("storage", permissions)
     }
 
-    // USB permission handling
     private val usbManager: UsbManager by lazy {
         activity.getSystemService(Context.USB_SERVICE) as UsbManager
     }
@@ -140,7 +136,6 @@ class PermissionManager(
                     val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
                     if (device != null && isTopdonTC001Device(device)) {
                         Log.i(TAG, "Topdon TC001 attached: ${device.deviceName}")
-                        // Auto-request permission for newly attached Topdon device
                         activity.lifecycleScope.launch {
                             requestUsbPermission(device)
                         }
@@ -162,11 +157,9 @@ class PermissionManager(
         }
     }
 
-    // Callback storage
     private var pendingCallbacks = mutableMapOf<String, (Boolean) -> Unit>()
 
     init {
-        // Register USB broadcast receiver
         val filter = IntentFilter().apply {
             addAction(ACTION_USB_PERMISSION)
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
@@ -192,7 +185,7 @@ class PermissionManager(
         Log.i(TAG, "Requesting all permissions for multi-modal recording")
 
         val permissionResults = mutableMapOf<String, Boolean>()
-        var totalPermissionGroups = 4 // camera, bluetooth, storage, usb
+        var totalPermissionGroups = 4
         var completedGroups = 0
 
         fun checkCompletion() {
@@ -204,25 +197,21 @@ class PermissionManager(
             }
         }
 
-        // Request camera permissions
         requestCameraPermissions { granted ->
             permissionResults["camera"] = granted
             checkCompletion()
         }
 
-        // Request Bluetooth permissions
         requestBluetoothPermissions { granted ->
             permissionResults["bluetooth"] = granted
             checkCompletion()
         }
 
-        // Request storage permissions
         requestStoragePermissions { granted ->
             permissionResults["storage"] = granted
             checkCompletion()
         }
 
-        // Request USB permissions
         activity.lifecycleScope.launch {
             val usbGranted = requestUsbPermissions()
             permissionResults["usb"] = usbGranted
@@ -299,7 +288,7 @@ class PermissionManager(
             requestUsbPermission(topdonDevice)
         } else {
             Log.w(TAG, "No Topdon TC001 device found for permission request")
-            true // Don't block if device not present
+            true
         }
     }
 
@@ -564,7 +553,6 @@ class PermissionManager(
         
         fun requestNext() {
             if (currentIndex >= permissionTypes.size) {
-                // USB permissions are handled separately as they're not runtime permissions
                 activity.lifecycleScope.launch {
                     val usbGranted = requestUsbPermissions()
                     permissionResults["usb"] = usbGranted

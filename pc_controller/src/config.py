@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-# Internal cache
 __CONFIG_CACHE: dict[str, Any] | None = None
 
 
@@ -30,7 +29,6 @@ def _load_from_file(path: Path) -> dict[str, Any]:
     except FileNotFoundError:
         return {}
     except Exception:
-        # On malformed JSON or other errors, return empty to keep app functional
         return {}
 
 

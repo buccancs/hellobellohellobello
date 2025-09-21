@@ -25,7 +25,6 @@ class DeviceConnectionManager(
         private const val TAG = "DeviceConnectionManager"
     }
 
-    // Individual device states
     private val _shimmerState = MutableStateFlow(DeviceState.DISCONNECTED)
     val shimmerState: StateFlow<DeviceState> = _shimmerState.asStateFlow()
 
@@ -41,11 +40,9 @@ class DeviceConnectionManager(
     private val _networkState = MutableStateFlow(DeviceState.DISCONNECTED)
     val networkState: StateFlow<DeviceState> = _networkState.asStateFlow()
 
-    // Combined overall system state
     private val _overallState = MutableStateFlow(OverallSystemState.NOT_READY)
     val overallState: StateFlow<OverallSystemState> = _overallState.asStateFlow()
 
-    // Device status details
     private val _deviceDetails = MutableStateFlow<Map<String, DeviceDetails>>(emptyMap())
     val deviceDetails: StateFlow<Map<String, DeviceDetails>> = _deviceDetails.asStateFlow()
 
@@ -85,7 +82,6 @@ class DeviceConnectionManager(
     )
 
     init {
-        // Combine all device states to determine overall system state
         combine(
             shimmerState,
             rgbCameraState,
@@ -95,8 +91,6 @@ class DeviceConnectionManager(
         ) { shimmer, rgb, thermal, audio, network ->
             calculateOverallState(shimmer, rgb, thermal, audio, network)
         }.also { flow ->
-            // This would normally be collected in a coroutine scope
-            // For now, we'll track states manually in update methods
         }
     }
 

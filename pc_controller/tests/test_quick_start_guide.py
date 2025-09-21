@@ -6,7 +6,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-# Skip GUI tests when libraries not available
 pytest_plugins = []
 try:
     import importlib.util
@@ -27,11 +26,9 @@ class TestQuickStartGuide:
             parent = Mock()
             guide = QuickStartGuide(parent)
 
-            # Verify steps are created
             assert len(guide.steps) > 0
             assert guide.current_step == 0
 
-            # Check first step
             first_step = guide.steps[0]
         except ImportError:
             pytest.skip("Quick start guide not available in test environment")
@@ -48,7 +45,6 @@ class TestQuickStartGuide:
 
             initial_step = guide.current_step
 
-            # Test navigation (would normally be triggered by button clicks)
             guide._on_next()
             assert guide.current_step == initial_step + 1
 
@@ -65,20 +61,17 @@ class TestQuickStartGuide:
             parent = Mock()
             guide = QuickStartGuide(parent)
 
-            # Mock signal connections
             completed_callback = Mock()
             skipped_callback = Mock()
 
             guide.tutorial_completed.connect(completed_callback)
             guide.tutorial_skipped.connect(skipped_callback)
 
-            # Test completion
         except ImportError:
             pytest.skip("Quick start guide not available in test environment")
         guide._on_finish()
         completed_callback.assert_called_once()
 
-        # Test skipping
         guide._on_skip()
         skipped_callback.assert_called_once()
 
@@ -102,12 +95,10 @@ class TestFirstTimeSetupWizard:
 
         mock_settings = Mock()
 
-        # Test should show for new users
         mock_settings.get_boolean.return_value = False
         wizard = FirstTimeSetupWizard(mock_settings)
         assert wizard.should_show_tutorial()
 
-        # Test should not show for returning users
         mock_settings.get_boolean.return_value = True
         wizard = FirstTimeSetupWizard(mock_settings)
         assert not wizard.should_show_tutorial()
@@ -119,11 +110,9 @@ class TestFirstTimeSetupWizard:
         mock_settings = Mock()
         wizard = FirstTimeSetupWizard(mock_settings)
 
-        # Test completion callback
         wizard._on_tutorial_completed()
         mock_settings.set_boolean.assert_called_with("tutorial_completed", True)
 
-        # Test skip callback
         mock_settings.reset_mock()
         wizard._on_tutorial_skipped()
         mock_settings.set_boolean.assert_called_with("tutorial_skipped", True)
@@ -174,12 +163,10 @@ class TestTutorialContent:
         """Test that tutorial covers all essential topics."""
         from core.quick_start_guide import QuickStartGuide
 
-        # Create actual instance to test content
         mock_guide_class.side_effect = lambda parent: QuickStartGuide.__new__(QuickStartGuide)
         guide = QuickStartGuide.__new__(QuickStartGuide)
         guide.steps = guide._create_tutorial_steps()
 
-        # Check essential topics are covered
         all_content = " ".join([step.content.lower() for step in guide.steps])
 
         essential_topics = [
@@ -200,7 +187,6 @@ class TestTutorialContent:
         guide = QuickStartGuide.__new__(QuickStartGuide)
         guide.steps = guide._create_tutorial_steps()
 
-        # Check for actionable language
         actionable_keywords = ["click", "select", "choose", "start", "connect", "configure"]
 
         content_with_actions = 0
@@ -209,7 +195,6 @@ class TestTutorialContent:
             if any(keyword in content_lower for keyword in actionable_keywords):
                 content_with_actions += 1
 
-        # Most steps should have actionable content
         assert content_with_actions >= len(guide.steps) * 0.7
 
 
@@ -225,12 +210,10 @@ class TestTutorialIntegration:
 
         integration = integrate_quick_start_guide(mock_gui, mock_settings)
 
-        # Check integration structure
         assert 'show_tutorial_if_first_time' in integration
         assert 'show_tutorial_on_demand' in integration
         assert 'setup_wizard' in integration
 
-        # Check functions are callable
         assert callable(integration['show_tutorial_if_first_time'])
         assert callable(integration['show_tutorial_on_demand'])
 
@@ -245,7 +228,6 @@ class TestTutorialIntegration:
         mock_parent = Mock()
         wizard.show_tutorial_on_demand(mock_parent)
 
-        # Verify tutorial was created and shown
         mock_guide.assert_called_once_with(mock_parent)
         mock_guide.return_value.exec.assert_called_once()
 
@@ -258,17 +240,14 @@ class TestTutorialPersistence:
         with tempfile.TemporaryDirectory() as temp_dir:
             flag_file = os.path.join(temp_dir, ".tutorial_completed")
 
-            # File should not exist initially
             assert not os.path.exists(flag_file)
 
             # Simulate flag file creation
             with open(flag_file, 'w') as f:
                 f.write("Tutorial offered on first run")
 
-            # File should now exist
             assert os.path.exists(flag_file)
 
-            # Content should be readable
             with open(flag_file) as f:
                 content = f.read()
                 assert "Tutorial offered" in content

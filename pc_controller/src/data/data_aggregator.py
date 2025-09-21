@@ -78,8 +78,8 @@ class FileReceiverServer(QThread):
     log = pyqtSignal(str)
     progress = pyqtSignal(
         str, int, int
-    )  # device_id, bytes_received, total_bytes(-1 if unknown)
-    file_received = pyqtSignal(str, str)  # session_id, device_id
+    )
+    file_received = pyqtSignal(str, str)
 
     def __init__(
         self, base_dir: str, port: int = 9001, parent: QObject | None = None
@@ -139,7 +139,6 @@ class FileReceiverServer(QThread):
                     except Exception as exc:
                         self.log.emit(f"Accept error: {exc}")
                         continue
-                    # Handle single connection
                     with conn:
                         # Wrap with TLS if configured
                         try:
@@ -150,7 +149,6 @@ class FileReceiverServer(QThread):
                                     self.log.emit(f"TLS wrap failed from {addr}: {exc}")
                                     continue
                             conn.settimeout(10.0)
-                            # Read the header line
                             header_line = b""
                             while b"\n" not in header_line:
                                 chunk = conn.recv(4096)
@@ -169,7 +167,6 @@ class FileReceiverServer(QThread):
                             tmp_zip_path = os.path.join(
                                 target_dir, header.filename or "data.zip"
                             )
-                            # Write any remainder + subsequent stream to file
                             bytes_written = 0
                             total = header.size if header.size is not None else -1
                             with open(tmp_zip_path, "wb") as f:
@@ -201,7 +198,6 @@ class FileReceiverServer(QThread):
                                         self.progress.emit(
                                             header.device_id, bytes_written, total
                                         )
-                            # Unpack
                             try:
                                 with zipfile.ZipFile(tmp_zip_path, "r") as zf:
                                     zf.extractall(target_dir)

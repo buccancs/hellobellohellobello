@@ -32,7 +32,6 @@ class GsrCsvWriter:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._fh = self._path.open("w", encoding="utf-8", newline=self._newline)
         self._writer = csv.writer(self._fh)
-        # Header
         self._writer.writerow(["timestamp_ns", "gsr"])
         self._fh.flush()
 
@@ -42,7 +41,6 @@ class GsrCsvWriter:
         assert self._writer is not None
         with self._lock:
             self._writer.writerow([int(ts_ns), float(value)])
-            # Flush lightly to ensure data durability in tests
             if self._fh:
                 self._fh.flush()
 

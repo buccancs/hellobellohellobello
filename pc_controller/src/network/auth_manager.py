@@ -65,16 +65,15 @@ class AuthManager:
         # Configuration
         self._token_lifetime = int(
             cfg_get("auth_token_lifetime_seconds", 3600)
-        )  # 1 hour
+        )
         self._challenge_timeout = int(cfg_get("auth_challenge_timeout_seconds", 30))
-        self._nonce_window = int(cfg_get("auth_nonce_window_seconds", 300))  # 5 minutes
+        self._nonce_window = int(cfg_get("auth_nonce_window_seconds", 300))
         self._max_nonce_cache = int(cfg_get("auth_max_nonce_cache", 10000))
 
     def _get_or_generate_secret(self) -> str:
         """Get secret key from config or generate a new one."""
         secret = cfg_get("auth_secret_key")
         if not secret:
-            # Generate a secure random secret
             secret = secrets.token_urlsafe(32)
         return secret
 
@@ -119,12 +118,10 @@ class AuthManager:
 
         challenge_info = self._pending_challenges[device_id]
 
-        # Check challenge timeout
         if time.time() - challenge_info.timestamp > self._challenge_timeout:
             del self._pending_challenges[device_id]
             return False
 
-        # Extract response fields
         try:
             received_signature = response_data.get("signature", "")
             received_nonce = response_data.get("nonce", "")
@@ -132,32 +129,26 @@ class AuthManager:
         except (ValueError, TypeError):
             return False
 
-        # Verify nonce matches and hasn't been used
         if received_nonce != challenge_info.nonce:
             return False
 
         if received_nonce in self._used_nonces:
-            return False  # Replay attack prevention
+            return False
 
-        # Check timestamp window
         if abs(time.time() - received_timestamp) > self._nonce_window:
             return False
 
-        # Compute expected signature
         payload = f"{challenge_info.challenge}:{received_nonce}:{received_timestamp}"
         expected_signature = hmac.new(
             self._secret_key.encode(), payload.encode(), hashlib.sha256
         ).hexdigest()
 
-        # Verify signature
         if not hmac.compare_digest(received_signature, expected_signature):
             return False
 
-        # Authentication successful - create token
         token = self._create_token(device_id)
         self._active_tokens[device_id] = token
 
-        # Clean up
         del self._pending_challenges[device_id]
         self._used_nonces.add(received_nonce)
         self._cleanup_nonces()
@@ -206,16 +197,13 @@ class AuthManager:
 
         token = self._active_tokens[device_id]
 
-        # Check token expiration
         if time.time() > token.expires_at:
             del self._active_tokens[device_id]
             return False
 
-        # Check permissions
         if action not in token.permissions:
             return False
 
-        # Check nonce for replay protection if provided
         if nonce:
             if nonce in self._used_nonces:
                 return False
@@ -250,7 +238,6 @@ class AuthManager:
             else:
                 expired.append(device_id)
 
-        # Clean up expired tokens
         for device_id in expired:
             del self._active_tokens[device_id]
 
@@ -259,8 +246,6 @@ class AuthManager:
     def _cleanup_nonces(self):
         """Clean up old nonces to prevent memory growth."""
         if len(self._used_nonces) > self._max_nonce_cache:
-            # Keep only the most recent nonces (this is a simple approach)
-            # In production, might want to use a time-based cleanup
             nonces_list = list(self._used_nonces)
             keep_count = self._max_nonce_cache // 2
             self._used_nonces = set(nonces_list[-keep_count:])
@@ -269,7 +254,6 @@ class AuthManager:
         """Clean up expired tokens and challenges."""
         current_time = time.time()
 
-        # Clean expired tokens
         expired_tokens = [
             device_id
             for device_id, token in self._active_tokens.items()
@@ -278,7 +262,6 @@ class AuthManager:
         for device_id in expired_tokens:
             del self._active_tokens[device_id]
 
-        # Clean expired challenges
         expired_challenges = [
             device_id
             for device_id, challenge in self._pending_challenges.items()

@@ -20,7 +20,6 @@ def test_encode_decode_roundtrip_single() -> None:
 
 
 def test_encode_decode_roundtrip_concatenated() -> None:
-    # Two different messages encoded back-to-back
     m1 = {"v": 1, "type": "cmd", "id": 1, "command": "a"}
     m2 = {"v": 1, "type": "cmd", "id": 2, "command": "b", "payload": {"k": "v"}}
     buf = encode_frame(m1) + encode_frame(m2)
@@ -33,7 +32,6 @@ def test_backoff_schedule_properties() -> None:
     sched = compute_backoff_schedule(100, 4)
     assert sched == [100, 200, 400, 800]
     assert all(isinstance(x, int) and x > 0 for x in sched)
-    # Check non-decreasing with default factor 2.0
     assert all(b <= a * 2 for a, b in itertools.pairwise(sched))
     assert compute_backoff_schedule(100, 0) == []
     assert compute_backoff_schedule(100, -3) == []

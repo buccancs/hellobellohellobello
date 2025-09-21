@@ -4,8 +4,8 @@ package com.shimmerresearch.driver
  * ShimmerMsg data container for callback communication
  */
 data class ShimmerMsg(
-    val mIdentifier: Int, // Message type identifier
-    val mB: Any?, // Message payload
+    val mIdentifier: Int,
+    val mB: Any?,
 )
 
 /**

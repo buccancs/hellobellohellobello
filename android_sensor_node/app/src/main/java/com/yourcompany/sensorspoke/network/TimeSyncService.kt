@@ -31,23 +31,21 @@ class TimeSyncService(
         private const val TAG = "TimeSyncService"
         private const val DEFAULT_TIME_SERVER_PORT = 8081
         private const val SYNC_REQUEST_TIMEOUT_MS = 5000L
-        private const val SYNC_INTERVAL_MS = 30000L // 30 seconds
+        private const val SYNC_INTERVAL_MS = 30000L
         private const val MAX_SYNC_ATTEMPTS = 3
-        private const val ACCEPTABLE_SYNC_ACCURACY_MS = 5L // 5ms target accuracy
+        private const val ACCEPTABLE_SYNC_ACCURACY_MS = 5L
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var syncJob: Job? = null
     private var isActive = false
 
-    // Time synchronization state
     private var clockOffsetNs: Long = 0L
     private var lastSyncTimestamp: Long = 0L
     private var syncAccuracyMs: Double = Double.MAX_VALUE
     private var pcHubAddress: InetAddress? = null
     private var timeServerPort: Int = DEFAULT_TIME_SERVER_PORT
 
-    // Sync statistics for quality monitoring
     private var successfulSyncs: Int = 0
     private var failedSyncs: Int = 0
     private var averageRoundTripMs: Double = 0.0
@@ -75,7 +73,7 @@ class TimeSyncService(
                 } catch (e: Exception) {
                     Log.e(TAG, "Time sync error: ${e.message}", e)
                     failedSyncs++
-                    delay(SYNC_INTERVAL_MS / 2) // Retry sooner on failure
+                    delay(SYNC_INTERVAL_MS / 2)
                 }
             }
         }
@@ -138,12 +136,10 @@ class TimeSyncService(
         var bestRoundTrip: Long = Long.MAX_VALUE
         var successCount = 0
 
-        // Multiple samples for accuracy (NTP-like approach)
         repeat(MAX_SYNC_ATTEMPTS) { attempt ->
             try {
                 val result = performSingleSync(hubAddr)
                 if (result != null) {
-                    // Choose sync with lowest round-trip time
                     if (result.roundTripTimeNs < bestRoundTrip) {
                         bestOffset = result.clockOffsetNs
                         bestRoundTrip = result.roundTripTimeNs
@@ -151,7 +147,6 @@ class TimeSyncService(
                     successCount++
                 }
 
-                // Small delay between attempts
                 if (attempt < MAX_SYNC_ATTEMPTS - 1) {
                     delay(100)
                 }
@@ -162,7 +157,7 @@ class TimeSyncService(
 
         if (successCount > 0) {
             clockOffsetNs = bestOffset
-            syncAccuracyMs = bestRoundTrip / 2_000_000.0 // Half round-trip in ms
+            syncAccuracyMs = bestRoundTrip / 2_000_000.0
             lastSyncTimestamp = System.currentTimeMillis()
             successfulSyncs++
             averageRoundTripMs = (averageRoundTripMs * (successfulSyncs - 1) + bestRoundTrip / 1_000_000.0) / successfulSyncs
@@ -184,10 +179,8 @@ class TimeSyncService(
             socket = DatagramSocket()
             socket.soTimeout = SYNC_REQUEST_TIMEOUT_MS.toInt()
 
-            // T1: Client timestamp when request is sent
             val t1 = System.nanoTime()
 
-            // Create time sync request
             val request = JSONObject().apply {
                 put("type", "TIME_SYNC_REQUEST")
                 put("client_timestamp", t1)
@@ -199,23 +192,19 @@ class TimeSyncService(
 
             socket.send(requestPacket)
 
-            // Receive response
             val responseBuffer = ByteArray(1024)
             val responsePacket = DatagramPacket(responseBuffer, responseBuffer.size)
             socket.receive(responsePacket)
 
-            // T4: Client timestamp when response is received
             val t4 = System.nanoTime()
 
             val responseStr = String(responsePacket.data, 0, responsePacket.length, StandardCharsets.UTF_8)
             val response = JSONObject(responseStr)
 
             if (response.getString("type") == "TIME_SYNC_RESPONSE") {
-                val t2 = response.getLong("server_receive_timestamp") // Server timestamp when request received
-                val t3 = response.getLong("server_send_timestamp") // Server timestamp when response sent
+                val t2 = response.getLong("server_receive_timestamp")
+                val t3 = response.getLong("server_send_timestamp")
 
-                // Calculate clock offset using NTP algorithm
-                // offset = ((t2 - t1) + (t3 - t4)) / 2
                 val clockOffset = ((t2 - t1) + (t3 - t4)) / 2
                 val roundTripTime = (t4 - t1) - (t3 - t2)
 

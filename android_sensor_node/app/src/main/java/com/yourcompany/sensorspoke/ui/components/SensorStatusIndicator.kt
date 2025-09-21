@@ -7,7 +7,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
-// R import handled automatically
+import com.yourcompany.sensorspoke.R
 
 /**
  * Custom UI component for displaying real-time sensor status with visual indicators.
@@ -39,7 +39,6 @@ class SensorStatusIndicator @JvmOverloads constructor(
         sensorLabel.text = sensorName
         statusText.text = status.statusMessage
 
-        // Update status dot color based on sensor state
         val dotColor = when {
             status.isActive && status.isHealthy -> ContextCompat.getColor(context, android.R.color.holo_green_light)
             status.isActive && !status.isHealthy -> ContextCompat.getColor(context, android.R.color.holo_orange_light)
@@ -49,7 +48,6 @@ class SensorStatusIndicator @JvmOverloads constructor(
 
         statusDot.setColorFilter(dotColor)
 
-        // Update text color to match status
         val textColor = when {
             status.isActive && status.isHealthy -> ContextCompat.getColor(context, android.R.color.black)
             status.isActive && !status.isHealthy -> ContextCompat.getColor(context, android.R.color.holo_orange_dark)

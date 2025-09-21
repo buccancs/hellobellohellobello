@@ -42,21 +42,17 @@ class ConnectionManager(
     private var heartbeatJob: Job? = null
     private var reconnectJob: Job? = null
 
-    // Connection state
     private val isConnected = AtomicBoolean(false)
     private val isReconnecting = AtomicBoolean(false)
     private val reconnectAttempts = AtomicInteger(0)
     private val lastHeartbeatTime = AtomicLong(0)
 
-    // PC Hub connection info
     private var hubAddress: InetAddress? = null
     private var hubPort: Int = 0
 
-    // Session persistence
     private var currentSessionId: String? = null
     private var wasRecording: Boolean = false
 
-    // Callbacks
     var onConnectionEstablished: ((InetAddress, Int) -> Unit)? = null
     var onConnectionLost: (() -> Unit)? = null
     var onConnectionRestored: (() -> Unit)? = null
@@ -96,11 +92,9 @@ class ConnectionManager(
             onConnectionEstablished?.invoke(addr, hubPort)
         }
 
-        // If we were reconnecting, notify restoration
         if (reconnectAttempts.get() > 0) {
             onConnectionRestored?.invoke()
 
-            // If we had an active session, try to rejoin
             currentSessionId?.let { sessionId ->
                 if (wasRecording) {
                     scope.launch {
@@ -161,7 +155,6 @@ class ConnectionManager(
                 }
             }
 
-            // Max attempts reached
             if (reconnectAttempts.get() >= MAX_RECONNECT_ATTEMPTS) {
                 Log.e(TAG, "Max reconnection attempts reached")
                 isReconnecting.set(false)
@@ -212,7 +205,6 @@ class ConnectionManager(
     private suspend fun sendHeartbeat() {
         val heartbeat = EnhancedProtocol.createHeartbeatMessage()
 
-        // Add connection statistics
         heartbeat.put(
             "connection_stats",
             JSONObject().apply {
@@ -319,5 +311,5 @@ class ConnectionManager(
  * Extension for NetworkClient to support suspending message sending
  */
 suspend fun NetworkClient.sendMessage(message: String): Boolean = withContext(Dispatchers.IO) {
-    sendMessage(message) // Use the existing sendMessage method
+    sendMessage(message)
 }

@@ -78,7 +78,7 @@ class DeviceWidget(QWidget):
     Two modes:
     - video: displays frames in a QLabel
     - gsr: displays a scrolling waveform using PyQtGraph
-    
+
     Enhanced with connection status indicators and progress tracking.
     """
 
@@ -88,27 +88,23 @@ class DeviceWidget(QWidget):
         self.title = title
         self.setObjectName(f"DeviceWidget::{kind}::{title}")
         layout = QVBoxLayout(self)
-        
-        # Enhanced header with status indicator
+
         header_layout = QHBoxLayout()
         self.header = QLabel(title, self)
         self.header.setAlignment(Qt.AlignmentFlag.AlignLeft)
         header_layout.addWidget(self.header)
-        
-        # Connection status indicator
+
         self.status_indicator = QLabel("●", self)
         self.status_indicator.setStyleSheet("color: gray; font-weight: bold;")
         self.status_indicator.setToolTip("Device Status: Disconnected")
         header_layout.addWidget(self.status_indicator)
-        
-        # Add stretch to push status to right
+
         header_layout.addStretch()
-        
-        # Progress bar for recording status  
+
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setVisible(False)
         self.progress_bar.setMaximumHeight(8)
-        
+
         layout.addLayout(header_layout)
         layout.addWidget(self.progress_bar)
 
@@ -116,7 +112,9 @@ class DeviceWidget(QWidget):
             self.view = QLabel(self)
             self.view.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.view.setMinimumSize(320, 180)
-            self.view.setStyleSheet("border: 1px solid gray; background-color: #f0f0f0;")
+            self.view.setStyleSheet(
+                "border: 1px solid gray; background-color: #f0f0f0;"
+            )
             layout.addWidget(self.view)
         elif kind == "gsr":
             if pg is None:
@@ -128,15 +126,18 @@ class DeviceWidget(QWidget):
                 self.view = pg.PlotWidget(self)
                 self.view.setBackground("w")
                 self.curve = self.view.plot(pen=pg.mkPen(color=(0, 120, 255), width=2))
+                self.view.setLabel('left', 'GSR (μS)')
+                self.view.setLabel('bottom', 'Time (s)')
+                self.view.showGrid(x=True, y=True, alpha=0.3)
                 layout.addWidget(self.view)
-            # Data buffer for plotting: last 10 seconds at 128 Hz
             self._buf_seconds = 10.0
             self._buf_max = int(128 * self._buf_seconds)
             self._times: deque[float] = deque(maxlen=self._buf_max)
             self._values: deque[float] = deque(maxlen=self._buf_max)
+            self._last_sample_count = 0
         else:
             raise ValueError(f"Unsupported DeviceWidget kind: {kind}")
-    
+
     def set_connection_status(self, connected: bool) -> None:
         """Update the visual connection status indicator."""
         if connected:
@@ -145,7 +146,7 @@ class DeviceWidget(QWidget):
         else:
             self.status_indicator.setStyleSheet("color: gray; font-weight: bold;")
             self.status_indicator.setToolTip("Device Status: Disconnected")
-    
+
     def set_recording_status(self, recording: bool, progress: int = 0) -> None:
         """Update recording status with optional progress indication."""
         if recording:
@@ -155,13 +156,18 @@ class DeviceWidget(QWidget):
             self.status_indicator.setToolTip("Device Status: Recording")
         else:
             self.progress_bar.setVisible(False)
-            # Restore connection status color
-            self.set_connection_status(True)  # Assume connected if we can stop recording
-    
+            self.set_connection_status(
+                True
+            )
+
     def set_error_status(self, error_msg: str = "") -> None:
         """Set device to error status with optional error message."""
         self.status_indicator.setStyleSheet("color: orange; font-weight: bold;")
-        tooltip = f"Device Status: Error - {error_msg}" if error_msg else "Device Status: Error"
+        tooltip = (
+            f"Device Status: Error - {error_msg}"
+            if error_msg
+            else "Device Status: Error"
+        )
         self.status_indicator.setToolTip(tooltip)
 
     def update_video_frame(self, frame_bgr: np.ndarray) -> None:
@@ -169,7 +175,6 @@ class DeviceWidget(QWidget):
             return
         if frame_bgr is None:
             return
-        # Convert BGR to RGB for QImage
         if frame_bgr.ndim == 3 and frame_bgr.shape[2] == 3:
             frame_rgb = frame_bgr[:, :, ::-1].copy()
             h, w, ch = frame_rgb.shape
@@ -205,19 +210,40 @@ class DeviceWidget(QWidget):
             return
         self._times.extend(ts.tolist())
         self._values.extend(vals.tolist())
-        # Update plot immediately; X axis as relative seconds
-        t0 = self._times[0] if self._times else time.monotonic()
-        x = np.fromiter(
-            (t - t0 for t in self._times), dtype=np.float64, count=len(self._times)
-        )
-        y = np.fromiter(self._values, dtype=np.float64, count=len(self._values))
-        self.curve.setData(x, y)
+        
+        # Enhanced real-time GSR visualization with performance optimizations
+        if len(self._times) > 0:
+            t0 = self._times[0]
+            x = np.fromiter(
+                (t - t0 for t in self._times), dtype=np.float64, count=len(self._times)
+            )
+            y = np.fromiter(self._values, dtype=np.float64, count=len(self._values))
+            
+            self.curve.setData(x, y)
+            
+            if y.size > 10:
+                y_min, y_max = np.min(y), np.max(y)
+                y_margin = (y_max - y_min) * 0.1 if y_max > y_min else 1.0
+                self.view.setYRange(y_min - y_margin, y_max + y_margin, padding=0)
+            
+            if x.size > 0:
+                x_latest = x[-1]
+                x_window = self._buf_seconds
+                self.view.setXRange(max(0, x_latest - x_window), x_latest + 0.5, padding=0)
+            
+            if hasattr(self, '_last_sample_count'):
+                current_count = len(self._values)
+                samples_added = current_count - self._last_sample_count
+                if samples_added > 0:
+                    expected_samples = 128 * 0.05
+                    rate_percentage = min(100, (samples_added / expected_samples) * 100)
+                    self.title.setText(f"{self.base_title} ({rate_percentage:.0f}% rate)")
+            self._last_sample_count = len(self._values)
 
 
 class GUIManager(QMainWindow):
     """Phase 3 GUI Manager implementing Dashboard and Logs with live local sensors."""
 
-    # Signals for internal logging from timers/threads
     ui_log = pyqtSignal(str)
 
     def __init__(self, network: NetworkController) -> None:
@@ -227,96 +253,85 @@ class GUIManager(QMainWindow):
         self._logger = logging.getLogger("pc_controller.gui")
         self._ensure_data_dir()
 
-        # Central tabs
         self.tabs = QTabWidget(self)
         self.setCentralWidget(self.tabs)
 
-        # Dashboard tab with dynamic grid and device discovery panel
         self.dashboard = QWidget(self)
         dashboard_layout = QHBoxLayout(self.dashboard)
-        
-        # Left panel: Device grid
+
         left_panel = QWidget(self)
         self.grid = QGridLayout(left_panel)
         self.grid.setContentsMargins(8, 8, 8, 8)
         self.grid.setSpacing(8)
         dashboard_layout.addWidget(left_panel, stretch=3)
-        
-        # Right panel: Device discovery and connection management
+
         right_panel = QWidget(self)
         right_panel.setMaximumWidth(300)
         right_panel.setMinimumWidth(250)
         right_layout = QVBoxLayout(right_panel)
-        
-        # Discovery section
+
         discovery_label = QLabel("Device Discovery", right_panel)
         discovery_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         right_layout.addWidget(discovery_label)
-        
-        # Discovery controls
+
         discovery_controls = QHBoxLayout()
         self.btn_refresh_devices = QPushButton("Refresh", right_panel)
         self.btn_refresh_devices.clicked.connect(self._refresh_device_discovery)
         discovery_controls.addWidget(self.btn_refresh_devices)
-        
+
         self.discovery_status = QLabel("Scanning...", right_panel)
         self.discovery_status.setStyleSheet("color: blue;")
         discovery_controls.addWidget(self.discovery_status)
         discovery_controls.addStretch()
         right_layout.addLayout(discovery_controls)
-        
-        # Discovered devices list
+
         self.discovered_devices = QListWidget(right_panel)
         self.discovered_devices.setMaximumHeight(150)
         right_layout.addWidget(self.discovered_devices)
-        
-        # Connection controls
+
         connection_controls = QHBoxLayout()
         self.btn_connect_device = QPushButton("Connect", right_panel)
         self.btn_connect_device.clicked.connect(self._connect_selected_device)
         self.btn_connect_device.setEnabled(False)
         connection_controls.addWidget(self.btn_connect_device)
-        
+
         self.btn_disconnect_device = QPushButton("Disconnect", right_panel)
         self.btn_disconnect_device.clicked.connect(self._disconnect_selected_device)
         self.btn_disconnect_device.setEnabled(False)
         connection_controls.addWidget(self.btn_disconnect_device)
         right_layout.addLayout(connection_controls)
-        
-        # Connected devices section
+
         connected_label = QLabel("Connected Devices", right_panel)
         connected_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         right_layout.addWidget(connected_label)
-        
+
         self.connected_devices = QListWidget(right_panel)
         self.connected_devices.setMaximumHeight(120)
         right_layout.addWidget(self.connected_devices)
-        
-        # Session status section
+
         session_label = QLabel("Session Status", right_panel)
         session_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         right_layout.addWidget(session_label)
-        
+
         self.session_status = QTextEdit(right_panel)
         self.session_status.setReadOnly(True)
         self.session_status.setMaximumHeight(100)
-        self.session_status.setStyleSheet("background-color: #f8f8f8; font-family: monospace; font-size: 10px;")
+        self.session_status.setStyleSheet(
+            "background-color: #f8f8f8; font-family: monospace; font-size: 10px;"
+        )
         right_layout.addWidget(self.session_status)
-        
+
         right_layout.addStretch()
         dashboard_layout.addWidget(right_panel, stretch=1)
-        
+
         self.tabs.addTab(self.dashboard, "Dashboard")
 
-        # Logs tab
         self.logs = QTextEdit(self)
         self.logs.setReadOnly(True)
         self.tabs.addTab(self.logs, "Logs")
 
-        # Playback & Annotation tab (Phase 5)
         self.playback = QWidget(self)
         self.playback_layout = QVBoxLayout(self.playback)
-        # Controls row
         self.playback_controls = QHBoxLayout()
         self.btn_load_session = QPushButton("Load Session", self.playback)
         self.btn_play = QPushButton("Play", self.playback)
@@ -328,12 +343,10 @@ class GUIManager(QMainWindow):
         self.playback_controls.addWidget(self.btn_pause)
         self.playback_controls.addWidget(self.btn_export)
         self.playback_layout.addLayout(self.playback_controls)
-        # Video area
         self.video_label = QLabel(self.playback)
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_label.setMinimumSize(480, 270)
         self.playback_layout.addWidget(self.video_label)
-        # Timeline slider
         self.timeline = QLabel("00:00.000", self.playback)
         self.slider = None
         try:
@@ -344,7 +357,6 @@ class GUIManager(QMainWindow):
             self.playback_layout.addWidget(self.slider)
         except Exception:
             pass
-        # Plot area
         if pg is not None:
             self.plot = pg.PlotWidget(self.playback)
             self.plot.setBackground("w")
@@ -356,7 +368,6 @@ class GUIManager(QMainWindow):
         else:
             self.plot = None
             self.cursor = None
-        # Annotation controls
         ann_row = QHBoxLayout()
         self.ann_input = QLineEdit(self.playback)
         self.ann_input.setPlaceholderText("Annotation text...")
@@ -368,14 +379,12 @@ class GUIManager(QMainWindow):
         self.playback_layout.addWidget(self.ann_list)
         self.tabs.addTab(self.playback, "Playback & Annotation")
 
-        # Wire buttons
         self.btn_load_session.clicked.connect(self._on_load_session)
         self.btn_play.clicked.connect(self._on_play)
         self.btn_pause.clicked.connect(self._on_pause)
         self.btn_add_ann.clicked.connect(self._on_add_annotation)
         self.btn_export.clicked.connect(self._on_export_hdf5)
 
-        # Playback state
         self._play_timer = QTimer(self)
         self._play_timer.setInterval(33)
         self._play_timer.timeout.connect(self._on_play_timer)
@@ -392,7 +401,6 @@ class GUIManager(QMainWindow):
         if self.slider is not None:
             self.slider.valueChanged.connect(self._on_slider_change)
 
-        # Data Aggregator for file transfers (Phase 5)
         self._data_aggregator = DataAggregator(
             os.path.join(os.getcwd(), "pc_controller_data")
         )
@@ -409,11 +417,9 @@ class GUIManager(QMainWindow):
         except Exception:
             pass
 
-        # Setup UI components
         self._setup_menu_bar()
         self._setup_toolbar()
 
-        # Local device widgets and interfaces
         self.webcam_widget = DeviceWidget("video", "Local Webcam", self)
         self.gsr_widget = DeviceWidget("gsr", "Shimmer GSR (Local)", self)
         self._add_to_grid(self.webcam_widget)
@@ -423,33 +429,25 @@ class GUIManager(QMainWindow):
         self.webcam = WebcamInterface() if WebcamInterface else None
         self.shimmer = ShimmerInterface() if ShimmerInterface else None
 
-        # Timers to poll devices without blocking UI
-        # Local preview throttling: enforce ~10 FPS render rate with drop logging
         self._video_fps_limit_hz: float = 10.0
         self._video_min_interval_s: float = 1.0 / max(1.0, self._video_fps_limit_hz)
         self._video_last_render_s: float = 0.0
         self._video_drop_count: int = 0
         self._video_drop_last_log_s: float = time.monotonic()
 
-        # Per-device remote preview throttling state
-        # Use a slightly stricter throttle for remote frames to ensure coalescing
-        # even on slow machines. This helps avoid UI overload and makes behavior
-        # deterministic in tests.
         self._remote_min_interval_s: float = max(self._video_min_interval_s, 0.99)
         self._remote_last_render_s: dict[str, float] = {}
         self._remote_drop_counts: dict[str, int] = {}
         self._remote_drop_last_log_s: dict[str, float] = {}
 
         self.video_timer = QTimer(self)
-        # Keep a reasonably fast poll, actual render limited by _video_min_interval_s
-        self.video_timer.setInterval(33)  # ~30 Hz poll, will drop to ~10 FPS render
+        self.video_timer.setInterval(33)
         self.video_timer.timeout.connect(self._on_video_timer)
 
         self.gsr_timer = QTimer(self)
         self.gsr_timer.setInterval(50)  # 20 Hz UI updates, data @128 Hz aggregated
         self.gsr_timer.timeout.connect(self._on_gsr_timer)
 
-        # Periodic time re-sync timer (every 3 minutes)
         self._resync_timer = QTimer(self)
         self._resync_timer.setInterval(180000)
         with contextlib.suppress(Exception):
@@ -457,11 +455,9 @@ class GUIManager(QMainWindow):
                 lambda: self._network.broadcast_time_sync()
             )
 
-        # Wire network logs and preview frames
         self._network.device_discovered.connect(self._on_device_discovered)
         self._network.device_removed.connect(self._on_device_removed)
         self._network.log.connect(self._on_log)
-        # Robustly connect preview_frame if present
         connected = False
         try:
             sig = getattr(self._network, "preview_frame", None)
@@ -487,10 +483,8 @@ class GUIManager(QMainWindow):
             self._log("preview_frame signal connected")
         self.ui_log.connect(self._on_log)
 
-        # Remote device widgets registry
         self._remote_widgets: dict[str, DeviceWidget] = {}
 
-        # Start discovery and local streaming by default
         self._network.start()
         try:
             if self.webcam:
@@ -503,24 +497,19 @@ class GUIManager(QMainWindow):
         self.video_timer.start()
         self.gsr_timer.start()
 
-        # Recording state
         self._recording = False
         self._video_writer = None
         self._gsr_file = None
         self._gsr_written_header = False
 
-        # Show first-time tutorial if needed (delayed to ensure UI is ready)
         QTimer.singleShot(1000, self._check_and_show_first_time_tutorial)
 
-    # Menu bar setup
     def _setup_menu_bar(self) -> None:
         """Set up the main menu bar with File, Tools, and Help menus."""
         menu_bar = self.menuBar()
 
-        # File Menu
         file_menu = menu_bar.addMenu("File")
 
-        # Add common file operations
         export_action = QAction("Export Data...", self)
         export_action.triggered.connect(self._on_export_data)
         file_menu.addAction(export_action)
@@ -531,7 +520,6 @@ class GUIManager(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
-        # Tools Menu
         tools_menu = menu_bar.addMenu("Tools")
 
         calibrate_action = QAction("Calibrate Cameras...", self)
@@ -544,7 +532,6 @@ class GUIManager(QMainWindow):
         settings_action.triggered.connect(self._show_settings_dialog)
         tools_menu.addAction(settings_action)
 
-        # Help Menu
         help_menu = menu_bar.addMenu("Help")
 
         quick_start_action = QAction("Quick Start Guide", self)
@@ -557,7 +544,6 @@ class GUIManager(QMainWindow):
         about_action.triggered.connect(self._show_about_dialog)
         help_menu.addAction(about_action)
 
-    # Toolbar setup
     def _setup_toolbar(self) -> None:
         toolbar = QToolBar("Session Controls", self)
         self.addToolBar(toolbar)
@@ -584,7 +570,6 @@ class GUIManager(QMainWindow):
         toolbar.addAction(self.act_calibrate)
         toolbar.addAction(self.act_export)
 
-    # Grid management: place next available cell in 2-column layout
     def _add_to_grid(self, widget: QWidget) -> None:
         count = self.grid.count()
         col_count = 2
@@ -592,118 +577,115 @@ class GUIManager(QMainWindow):
         col = count % col_count
         self.grid.addWidget(widget, row, col)
 
-    # Handlers
     def _on_start_session(self) -> None:
         """Start recording session with enhanced status tracking and feedback."""
         if self._recording:
-            QMessageBox.information(self, "Session Active", "A recording session is already active.")
+            QMessageBox.information(
+                self, "Session Active", "A recording session is already active."
+            )
             return
-            
+
         ts = time.strftime("%Y%m%d_%H%M%S")
         self._session_id = ts
         self._session_dir = os.path.join(os.getcwd(), "pc_controller_data", ts)
-        
+
         try:
             os.makedirs(self._session_dir, exist_ok=True)
-            
-            # Enhanced session start logging
+
             self._log(f"🎬 Starting recording session: {self._session_id}")
             self._update_session_status(f"🎬 Session started: {self._session_id}")
-            
-            # Update device widgets to show recording status
+
             connected_devices = self._network.get_connected_devices()
             for device_name in connected_devices:
                 if device_name in self._remote_widgets:
                     self._remote_widgets[device_name].set_recording_status(True, 0)
-            
-            # Update local device widgets
+
             self.webcam_widget.set_recording_status(True, 0)
             self.gsr_widget.set_recording_status(True, 0)
-            
-            # Broadcast start to Android spokes with session_id
+
             try:
                 self._network.broadcast_start_recording(self._session_id)
-                self._update_session_status(f"📤 Broadcast start command to {len(connected_devices)} device(s)")
+                self._update_session_status(
+                    f"📤 Broadcast start command to {len(connected_devices)} device(s)"
+                )
             except Exception as exc:
                 self._log(f"⚠️ Broadcast start failed: {exc}")
                 self._update_session_status(f"⚠️ Broadcast failed: {exc}")
-            
-            # Start periodic re-sync timer
+
             with contextlib.suppress(Exception):
                 self._resync_timer.start()
-                
+
             self._open_recorders(self._session_dir)
             self._recording = True
-            
-            # Update UI elements to reflect recording state
+
             self.act_start.setEnabled(False)
             self.act_stop.setEnabled(True)
-            
+
             self._log(f"✅ Session recording started successfully: {self._session_dir}")
-            self._update_session_status(f"✅ Recording active - saving to: {os.path.basename(self._session_dir)}")
-            
+            self._update_session_status(
+                f"✅ Recording active - saving to: {os.path.basename(self._session_dir)}"
+            )
+
         except Exception as exc:
             error_msg = f"Failed to start recording session: {exc}"
             self._log(f"❌ {error_msg}")
-            self._update_session_status(f"❌ Session start failed")
+            self._update_session_status("❌ Session start failed")
             QMessageBox.critical(self, "Session Start Failed", error_msg)
 
     def _on_stop_session(self) -> None:
         """Stop recording session with enhanced status tracking and cleanup."""
         if not self._recording:
-            QMessageBox.information(self, "No Active Session", "No recording session is currently active.")
+            QMessageBox.information(
+                self, "No Active Session", "No recording session is currently active."
+            )
             return
-            
+
         try:
-            self._log(f"🛑 Stopping recording session: {getattr(self, '_session_id', 'Unknown')}")
+            self._log(
+                f"🛑 Stopping recording session: {getattr(self, '_session_id', 'Unknown')}"
+            )
             self._update_session_status("🛑 Stopping session...")
-            
-            # Update device widgets to show stopping status
+
             connected_devices = self._network.get_connected_devices()
             for device_name in connected_devices:
                 if device_name in self._remote_widgets:
                     self._remote_widgets[device_name].set_recording_status(False)
-            
-            # Update local device widgets
+
             self.webcam_widget.set_recording_status(False)
             self.gsr_widget.set_recording_status(False)
-            
-            # Broadcast stop to Android spokes
+
             try:
                 self._network.broadcast_stop_recording()
-                self._update_session_status(f"📤 Broadcast stop command to {len(connected_devices)} device(s)")
+                self._update_session_status(
+                    f"📤 Broadcast stop command to {len(connected_devices)} device(s)"
+                )
             except Exception as exc:
                 self._log(f"⚠️ Broadcast stop failed: {exc}")
                 self._update_session_status(f"⚠️ Broadcast stop failed: {exc}")
-            
-            # Stop periodic re-sync timer
+
             with contextlib.suppress(Exception):
                 self._resync_timer.stop()
-                
-            # Close local recorders
+
             self._close_recorders()
             self._recording = False
-            
-            # Update UI elements
+
             self.act_start.setEnabled(True)
             self.act_stop.setEnabled(False)
-            
+
             session_id = getattr(self, "_session_id", "")
             self._log(f"✅ Session stopped successfully: {session_id}")
             self._update_session_status(f"✅ Session stopped: {session_id}")
-            
-            # Write session metadata with clock offsets for validation
+
             self._write_session_metadata()
-            
-            # Start file receiver and initiate transfer
+
             self._initiate_file_transfer()
-            
+
         except Exception as exc:
             error_msg = f"Error stopping session: {exc}"
             self._log(f"❌ {error_msg}")
-            self._update_session_status(f"❌ Session stop error")
+            self._update_session_status("❌ Session stop error")
             QMessageBox.warning(self, "Session Stop Error", error_msg)
-    
+
     def _write_session_metadata(self) -> None:
         """Write session metadata with enhanced information."""
         try:
@@ -711,8 +693,7 @@ class GUIManager(QMainWindow):
             sess_dir = getattr(self, "_session_dir", None)
             if sess_dir:
                 meta_path = os.path.join(sess_dir, "session_metadata.json")
-                
-                # Gather comprehensive metadata
+
                 offsets = {}
                 stats = {}
                 try:
@@ -720,9 +701,9 @@ class GUIManager(QMainWindow):
                     stats = self._network.get_clock_sync_stats()
                 except Exception:
                     pass
-                
+
                 connected_devices = self._network.get_connected_devices()
-                
+
                 meta = {
                     "version": 1,
                     "session_id": sess_id,
@@ -734,34 +715,37 @@ class GUIManager(QMainWindow):
                     "device_count": len(connected_devices),
                     "pc_controller_version": "1.0.0",
                 }
-                
+
                 with open(meta_path, "w", encoding="utf-8") as f:
                     json.dump(meta, f, indent=2)
-                    
+
                 self._log(f"📋 Session metadata written: {meta_path}")
-                self._update_session_status(f"📋 Metadata saved with {len(connected_devices)} device(s)")
-                
+                self._update_session_status(
+                    f"📋 Metadata saved with {len(connected_devices)} device(s)"
+                )
+
         except Exception as exc:
             self._log(f"⚠️ Failed to write session metadata: {exc}")
-    
+
     def _initiate_file_transfer(self) -> None:
         """Initiate file transfer from connected devices."""
         try:
-            # local import to avoid test-time issues
             from data.data_aggregator import get_local_ip
 
             port = self._data_aggregator.start_server(9001)
             host = get_local_ip()
-            session_id = getattr(self, '_session_id', '')
-            
+            session_id = getattr(self, "_session_id", "")
+
             self._network.broadcast_transfer_files(host, port, session_id)
-            
-            self._log(f"📥 File transfer initiated: {host}:{port} for session {session_id}")
-            self._update_session_status(f"📥 Awaiting file transfers from devices...")
-            
+
+            self._log(
+                f"📥 File transfer initiated: {host}:{port} for session {session_id}"
+            )
+            self._update_session_status("📥 Awaiting file transfers from devices...")
+
         except Exception as exc:
             self._log(f"⚠️ Failed to initiate file transfer: {exc}")
-            self._update_session_status(f"⚠️ File transfer setup failed")
+            self._update_session_status("⚠️ File transfer setup failed")
 
     def _on_connect_device(self) -> None:
         self._log("Connect Device action: use the Network tab in a future phase.")
@@ -770,71 +754,76 @@ class GUIManager(QMainWindow):
         """Trigger flash synchronization with enhanced feedback and status tracking."""
         try:
             connected_devices = self._network.get_connected_devices()
-            
+
             if not connected_devices:
                 QMessageBox.information(
                     self,
                     "No Connected Devices",
-                    "No devices are currently connected. Please connect to devices before using Flash Sync."
+                    "No devices are currently connected. "
+                    "Please connect to devices before using Flash Sync.",
                 )
                 return
-            
-            self._log(f"⚡ Triggering Flash Sync across {len(connected_devices)} device(s)")
-            self._update_session_status(f"⚡ Flash Sync - {len(connected_devices)} devices")
-            
-            # Visual feedback: briefly highlight all video widgets
+
+            self._log(
+                f"⚡ Triggering Flash Sync across {len(connected_devices)} device(s)"
+            )
+            self._update_session_status(
+                f"⚡ Flash Sync - {len(connected_devices)} devices"
+            )
+
             self._highlight_video_widgets()
-            
+
             self._network.broadcast_flash_sync()
-            
-            self._log(f"✅ Flash Sync broadcast sent to: {', '.join(connected_devices)}")
+
+            self._log(
+                f"✅ Flash Sync broadcast sent to: {', '.join(connected_devices)}"
+            )
             self._update_session_status("✅ Flash Sync completed")
-            
-            # Show success message with device list
+
             device_list = "\n".join([f"• {device}" for device in connected_devices])
             QMessageBox.information(
                 self,
                 "Flash Sync Sent",
-                f"Flash synchronization signal sent to {len(connected_devices)} device(s):\n\n{device_list}\n\n"
-                f"All connected cameras should have flashed simultaneously for timing verification."
+                f"Flash synchronization signal sent to {len(connected_devices)} device(s):\n\n"
+                f"{device_list}\n\n"
+                f"All connected cameras should have flashed simultaneously "
+                f"for timing verification.",
             )
-            
+
         except Exception as exc:
             error_msg = f"Flash Sync failed: {exc}"
             self._log(f"❌ {error_msg}")
             self._update_session_status("❌ Flash Sync failed")
             QMessageBox.critical(self, "Flash Sync Error", error_msg)
-    
+
     def _highlight_video_widgets(self) -> None:
         """Briefly highlight video widgets to show flash sync visually."""
         try:
-            # Flash local video widgets
             original_webcam_style = self.webcam_widget.view.styleSheet()
-            original_gsr_style = self.gsr_widget.styleSheet()
-            
-            # Apply flash effect
-            flash_style = "border: 3px solid yellow; background-color: rgba(255, 255, 0, 100);"
+            _original_gsr_style = self.gsr_widget.styleSheet()
+
+            flash_style = (
+                "border: 3px solid yellow; background-color: rgba(255, 255, 0, 100);"
+            )
             self.webcam_widget.view.setStyleSheet(flash_style)
-            
-            # Flash remote video widgets
+
             original_remote_styles = {}
             for name, widget in self._remote_widgets.items():
-                if hasattr(widget, 'view') and widget.kind == "video":
+                if hasattr(widget, "view") and widget.kind == "video":
                     original_remote_styles[name] = widget.view.styleSheet()
                     widget.view.setStyleSheet(flash_style)
-            
-            # Remove flash effect after short delay
+
             def restore_styles():
                 try:
                     self.webcam_widget.view.setStyleSheet(original_webcam_style)
                     for name, widget in self._remote_widgets.items():
-                        if name in original_remote_styles and hasattr(widget, 'view'):
+                        if name in original_remote_styles and hasattr(widget, "view"):
                             widget.view.setStyleSheet(original_remote_styles[name])
                 except Exception:
                     pass
-            
-            QTimer.singleShot(200, restore_styles)  # 200ms flash duration
-            
+
+            QTimer.singleShot(200, restore_styles)
+
         except Exception as exc:
             self._log(f"Visual flash effect error: {exc}")
 
@@ -859,38 +848,32 @@ class GUIManager(QMainWindow):
     @pyqtSlot(DiscoveredDevice)
     def _on_device_discovered(self, device: DiscoveredDevice) -> None:
         self._log(f"Discovered: {device.name} @ {device.address}:{device.port}")
-        
-        # Add to discovered devices list
+
         device_item = f"{device.name} ({device.address}:{device.port})"
         self.discovered_devices.addItem(device_item)
         self.btn_connect_device.setEnabled(True)
-        
-        # Update discovery status
+
         self._update_discovery_status()
-        
-        # Create a remote video widget per device if not exists
+
         if device.name not in self._remote_widgets:
             widget = DeviceWidget("video", f"Remote: {device.name}", self)
-            widget.set_connection_status(False)  # Initially disconnected
+            widget.set_connection_status(False)
             self._remote_widgets[device.name] = widget
             self._add_to_grid(widget)
 
     @pyqtSlot(str)
     def _on_device_removed(self, name: str) -> None:
         self._log(f"Removed: {name}")
-        
-        # Remove from discovered devices list
+
         for i in range(self.discovered_devices.count()):
             item = self.discovered_devices.item(i)
             if item and name in item.text():
                 self.discovered_devices.takeItem(i)
                 break
-        
-        # Update connection status in widget
+
         if name in self._remote_widgets:
             self._remote_widgets[name].set_connection_status(False)
-        
-        # Update UI states
+
         if self.discovered_devices.count() == 0:
             self.btn_connect_device.setEnabled(False)
         self._update_discovery_status()
@@ -905,8 +888,6 @@ class GUIManager(QMainWindow):
                     f"[DEBUG_LOG] on_preview_frame: {device_name}, " f"ts={ts_ns}"
                 )
             now = time.monotonic()
-            # If first time seeing this device, count initial burst frame as a drop
-            # to coalesce bursts deterministically in tests/CI.
             if device_name not in self._remote_last_render_s:
                 drops0 = self._remote_drop_counts.get(device_name, 0) + 1
                 self._remote_drop_counts[device_name] = drops0
@@ -917,7 +898,6 @@ class GUIManager(QMainWindow):
                     )
                 return
             last = self._remote_last_render_s.get(device_name, now)
-            # Enforce per-device remote throttle (stricter than local)
             if (now - last) < self._remote_min_interval_s:
                 drops = self._remote_drop_counts.get(device_name, 0) + 1
                 self._remote_drop_counts[device_name] = drops
@@ -954,16 +934,13 @@ class GUIManager(QMainWindow):
     def _log(self, message: str) -> None:
         self.ui_log.emit(message)
 
-    # Timers
     def _on_video_timer(self) -> None:
         try:
             if not self.webcam:
                 return
             now = time.monotonic()
-            # Throttle local preview to ~10 FPS; drop frames if called too frequently
             if (now - self._video_last_render_s) < self._video_min_interval_s:
                 self._video_drop_count += 1
-                # Log drop stats at most once per second
                 if (now - self._video_drop_last_log_s) >= 1.0:
                     self._log(
                         f"Local preview drops in last second: {self._video_drop_count}"
@@ -992,20 +969,17 @@ class GUIManager(QMainWindow):
         except Exception as exc:
             self._log(f"GSR update error: {exc}")
 
-    # Recording helpers
     def _ensure_data_dir(self) -> None:
         base = os.path.join(os.getcwd(), "pc_controller_data")
         os.makedirs(base, exist_ok=True)
 
     def _open_recorders(self, session_dir: str) -> None:
-        # Open GSR CSV
         self._gsr_path = os.path.join(session_dir, "gsr.csv")
         self._gsr_file = open(self._gsr_path, "w", encoding="utf-8")
         self._gsr_file.write("timestamp_ns,gsr_microsiemens,ppg_raw\n")
         self._gsr_written_header = True
-        # Open video writer if OpenCV available
         try:
-            import cv2  # local import
+            import cv2
 
             self._video_path = os.path.join(session_dir, "webcam.avi")
             self._video_fps = 30.0
@@ -1045,9 +1019,8 @@ class GUIManager(QMainWindow):
         if self._video_writer is None:
             return
         try:
-            import cv2  # local import
+            import cv2
 
-            # Ensure frame is 640x480 BGR
             fb = frame_bgr
             if fb is None:
                 return
@@ -1058,26 +1031,21 @@ class GUIManager(QMainWindow):
         except Exception as exc:
             self._log(f"Video write error: {exc}")
 
-    # ==========================
-    # Device Discovery and Connection Management  
-    # ==========================
     def _refresh_device_discovery(self) -> None:
         """Manually refresh device discovery with enhanced status feedback."""
         try:
             self._log("🔍 Refreshing device discovery...")
             self.discovery_status.setText("🔍 Scanning...")
             self.discovery_status.setStyleSheet("color: blue; font-weight: bold;")
-            
-            # Clear current list and reset UI state
+
             self.discovered_devices.clear()
             self.btn_connect_device.setEnabled(False)
-            
-            # Start discovery with enhanced logging
+
             self._network.start_discovery()
             self._update_session_status("🔍 Device discovery refresh initiated")
-            
-            # Show scanning progress with timeout
+
             scan_progress = 0
+
             def update_progress():
                 nonlocal scan_progress
                 scan_progress += 1
@@ -1087,20 +1055,20 @@ class GUIManager(QMainWindow):
                     QTimer.singleShot(1000, update_progress)
                 else:
                     self._update_discovery_status()
-            
+
             update_progress()
-            
+
         except Exception as exc:
             error_msg = f"Discovery refresh failed: {exc}"
             self._log(f"❌ {error_msg}")
             self.discovery_status.setText("❌ Error")
             self.discovery_status.setStyleSheet("color: red; font-weight: bold;")
             self._update_session_status("❌ Discovery refresh failed")
-    
+
     def _update_discovery_status(self) -> None:
         """Update discovery status based on found devices with enhanced information."""
         device_count = self.discovered_devices.count()
-        
+
         if device_count == 0:
             self.discovery_status.setText("📭 No devices found")
             self.discovery_status.setStyleSheet("color: orange; font-weight: bold;")
@@ -1109,161 +1077,154 @@ class GUIManager(QMainWindow):
             self.discovery_status.setText(f"📱 Found {device_count} device(s)")
             self.discovery_status.setStyleSheet("color: green; font-weight: bold;")
             self._update_session_status(f"📱 Discovered {device_count} device(s)")
-            
-            # Log discovered device details
+
             device_list = []
             for i in range(device_count):
                 item = self.discovered_devices.item(i)
                 if item:
                     device_list.append(item.text())
-            
+
             if device_list:
                 self._log(f"📋 Discovered devices: {', '.join(device_list)}")
-    
+
     def _connect_selected_device(self) -> None:
         """Connect to the selected discovered device with enhanced status tracking."""
         current_item = self.discovered_devices.currentItem()
         if not current_item:
-            QMessageBox.warning(self, "No Selection", "Please select a device to connect.")
+            QMessageBox.warning(
+                self, "No Selection", "Please select a device to connect."
+            )
             return
-        
+
         device_text = current_item.text()
         try:
-            # Extract device info from the list item text
-            # Format should be "Device Name (IP:Port)"
             device_name = device_text.split(" (")[0]
             addr_port = device_text.split(" (")[1].rstrip(")")
             address, port_str = addr_port.split(":")
             port = int(port_str)
-            
-            self._log(f"🔄 Initiating connection to {device_name} at {address}:{port}...")
+
+            self._log(
+                f"🔄 Initiating connection to {device_name} at {address}:{port}..."
+            )
             self._update_session_status(f"Connecting to {device_name}...")
-            
-            # Connect the status update signals before initiating connection
+
             self._network.device_connected.connect(self._on_device_connected)
             self._network.connection_error.connect(self._on_connection_error)
-            
+
             self._network.connect_to_device(address, port, device_name)
-            
-            # Add to connected devices list with connecting status
+
             connected_item = f"{device_name} - 🔄 Connecting..."
             self.connected_devices.addItem(connected_item)
             self.btn_disconnect_device.setEnabled(True)
-            
-            # Update corresponding remote widget status
+
             if device_name in self._remote_widgets:
-                self._remote_widgets[device_name].set_connection_status(False)  # Still connecting
-            
+                self._remote_widgets[device_name].set_connection_status(
+                    False
+                )
+
         except Exception as exc:
             error_msg = f"Connection initiation failed for {device_name}: {exc}"
             self._log(f"❌ {error_msg}")
             self._update_session_status(f"❌ Connection failed: {device_name}")
             QMessageBox.critical(self, "Connection Failed", error_msg)
-    
+
     def _disconnect_selected_device(self) -> None:
         """Disconnect from the selected connected device with enhanced status tracking."""
         current_item = self.connected_devices.currentItem()
         if not current_item:
-            QMessageBox.warning(self, "No Selection", "Please select a device to disconnect.")
+            QMessageBox.warning(
+                self, "No Selection", "Please select a device to disconnect."
+            )
             return
-        
+
         device_text = current_item.text()
         device_name = device_text.split(" - ")[0]
-        
+
         try:
             self._log(f"🔌 Disconnecting from {device_name}...")
             self._update_session_status(f"Disconnecting from {device_name}...")
-            
+
             self._network.disconnect_device(device_name)
-            
-            # Update the connection status in the list
+
             row = self.connected_devices.row(current_item)
             updated_item = f"{device_name} - 🔴 Disconnecting..."
             self.connected_devices.item(row).setText(updated_item)
-            
-            # Update corresponding remote widget status
+
             if device_name in self._remote_widgets:
                 self._remote_widgets[device_name].set_connection_status(False)
-            
-            # Remove from connected devices list after short delay
+
             QTimer.singleShot(1000, lambda: self._finalize_disconnect(device_name, row))
-                
+
         except Exception as exc:
             error_msg = f"Disconnection failed for {device_name}: {exc}"
             self._log(f"❌ {error_msg}")
             self._update_session_status(f"❌ Disconnection error: {device_name}")
-    
+
     def _finalize_disconnect(self, device_name: str, row: int) -> None:
         """Finalize disconnection by removing from UI lists."""
         try:
-            # Remove from connected devices list
             if row < self.connected_devices.count():
                 self.connected_devices.takeItem(row)
-            
+
             if self.connected_devices.count() == 0:
                 self.btn_disconnect_device.setEnabled(False)
-            
+
             self._log(f"✅ Successfully disconnected from {device_name}")
             self._update_session_status(f"✅ Disconnected: {device_name}")
-            
+
         except Exception as exc:
             self._log(f"Cleanup error after disconnect: {exc}")
-    
+
     def _update_session_status(self, message: str) -> None:
         """Update the session status display with enhanced formatting."""
         timestamp = time.strftime("%H:%M:%S")
         self.session_status.append(f"[{timestamp}] {message}")
-        # Auto-scroll to bottom
         cursor = self.session_status.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
         self.session_status.setTextCursor(cursor)
-    
+
     def _on_device_connected(self, device_name: str, success: bool) -> None:
         """Handle device connection status updates."""
         try:
             if success:
                 self._log(f"✅ Successfully connected to {device_name}")
                 self._update_session_status(f"✅ Connected: {device_name}")
-                
-                # Update connected devices list
+
                 for i in range(self.connected_devices.count()):
                     item = self.connected_devices.item(i)
                     if item and device_name in item.text():
                         item.setText(f"{device_name} - ✅ Connected")
                         break
-                
-                # Update remote widget connection status
+
                 if device_name in self._remote_widgets:
                     self._remote_widgets[device_name].set_connection_status(True)
-                
+
             else:
                 self._log(f"❌ Failed to connect to {device_name}")
                 self._update_session_status(f"❌ Connection failed: {device_name}")
-                
-                # Remove from connected devices list since connection failed
+
                 for i in range(self.connected_devices.count()):
                     item = self.connected_devices.item(i)
                     if item and device_name in item.text():
                         self.connected_devices.takeItem(i)
                         break
-                
+
                 if self.connected_devices.count() == 0:
                     self.btn_disconnect_device.setEnabled(False)
-                    
+
         except Exception as exc:
             self._log(f"Error handling connection status for {device_name}: {exc}")
-    
+
     def _on_connection_error(self, device_name: str, error_message: str) -> None:
         """Handle connection error notifications."""
         try:
             error_msg = f"Connection error for {device_name}: {error_message}"
             self._log(f"⚠️ {error_msg}")
             self._update_session_status(f"⚠️ {error_msg}")
-            
-            # Update remote widget to show error status
+
             if device_name in self._remote_widgets:
                 self._remote_widgets[device_name].set_error_status(error_message)
-                
+
             # Show user-friendly error dialog for critical connection issues
             if "timeout" in error_message.lower() or "refused" in error_message.lower():
                 QMessageBox.warning(
@@ -1274,18 +1235,14 @@ class GUIManager(QMainWindow):
                     f"• Device may be offline or unreachable\n"
                     f"• Network configuration issues\n"
                     f"• Device may be busy with another connection\n\n"
-                    f"Technical details: {error_message}"
+                    f"Technical details: {error_message}",
                 )
-                
+
         except Exception as exc:
             self._log(f"Error handling connection error for {device_name}: {exc}")
 
-    # ==========================
-    # Playback & Annotation API
-    # ==========================
     def _on_load_session(self) -> None:
         try:
-            # Pick a session directory
             base_dir = os.path.join(os.getcwd(), "pc_controller_data")
             session_dir = QFileDialog.getExistingDirectory(
                 self, "Select Session Directory", base_dir
@@ -1293,13 +1250,10 @@ class GUIManager(QMainWindow):
             if not session_dir:
                 return
             self._loaded_session_dir = session_dir
-            # Load annotations if present
             self._load_annotations()
-            # Index files
             try:
                 loader = DataLoader(session_dir)
                 sess = loader.index_files()
-                # Plot CSVs
                 if pg is not None and self.plot is not None:
                     self.plot.clear()
                     self.cursor = pg.InfiniteLine(
@@ -1309,12 +1263,10 @@ class GUIManager(QMainWindow):
                     )
                     self.plot.addItem(self.cursor)
                     self._plot_curves.clear()
-                    # Plot known columns
                     for rel_name in sess.csv_files.keys():
                         df = loader.load_csv(rel_name)
                         if df.empty:
                             continue
-                        # time base (seconds relative)
                         if (
                             isinstance(df.index.dtype, type)
                             or df.index.dtype is not None
@@ -1322,9 +1274,7 @@ class GUIManager(QMainWindow):
                             t0 = int(df.index.min())
                             x = (df.index.astype("int64") - t0) / 1e9
                         else:
-                            # fallback sequential index
                             x = list(range(len(df)))
-                        # choose first numeric column for plotting
                         for col in df.columns:
                             try:
                                 y = df[col].astype(float)
@@ -1336,10 +1286,8 @@ class GUIManager(QMainWindow):
                             )
                             self._plot_curves[name] = curve
                             break
-                # Open a video if available
                 vid_path = None
                 if sess.video_files:
-                    # take first video file
                     vid_path = next(iter(sess.video_files.values()))
                 if vid_path is not None:
                     try:
@@ -1363,19 +1311,16 @@ class GUIManager(QMainWindow):
                     except Exception as exc:
                         self._video_cap = None
                         self._log(f"OpenCV VideoCapture failed: {exc}")
-                # Set slider range
                 if self.slider is not None:
                     total_ms = (
                         self._video_duration_ms if self._video_duration_ms > 0 else 0
                     )
-                    # If no video, estimate from plotted data x range
                     if (
                         total_ms == 0
                         and pg is not None
                         and self.plot is not None
                         and len(self._plot_curves)
                     ):
-                        # Assume last added curve x values
                         try:
                             items = list(self._plot_curves.values())
                             data = items[0].getData()
@@ -1423,12 +1368,10 @@ class GUIManager(QMainWindow):
         try:
             import cv2
 
-            # Seek to current time
             self._video_cap.set(cv2.CAP_PROP_POS_MSEC, float(self._current_ms))
             ok, frame = self._video_cap.read()
             if not ok or frame is None:
                 return
-            # Convert BGR->RGB
             fb = frame[:, :, ::-1].copy()
             h, w, ch = fb.shape
             bytes_per_line = ch * w
@@ -1497,7 +1440,6 @@ class GUIManager(QMainWindow):
             self._log("No session loaded")
             return
         try:
-            # Choose output file
             out_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save HDF5",
@@ -1506,9 +1448,7 @@ class GUIManager(QMainWindow):
             )
             if not out_path:
                 return
-            # Minimal metadata: session dir name
             meta = {"session_dir": self._loaded_session_dir}
-            # Read annotations
             ann = {"annotations": self._annotations}
             export_session_to_hdf5(
                 self._loaded_session_dir, out_path, metadata=meta, annotations=ann
@@ -1530,23 +1470,19 @@ class GUIManager(QMainWindow):
                 )
                 return
 
-            # Show file location to user
             self._log(show_file_location(images_dir, "Calibration images"))
 
-            # Show progress dialog
             progress = QProgressBar()
             progress.setWindowTitle("Calibrating Cameras...")
-            progress.setRange(0, 0)  # Indeterminate progress
+            progress.setRange(0, 0)
             progress.show()
 
             try:
                 result = calibrate_camera(images_dir, board_size, square_size)
 
-                # Save calibration results
                 calibration_path = os.path.join(os.getcwd(), "calibration_results.json")
                 save_calibration(result, calibration_path)
 
-                # Show results with file location
                 success_message = (
                     f"Calibration completed successfully!\n"
                     f"RMS Error: {result.rms_error:.4f}\n"
@@ -1562,7 +1498,6 @@ class GUIManager(QMainWindow):
                 progress.close()
 
         except Exception as exc:
-            # Use user-friendly error messages
             user_message = ErrorMessageTranslator.translate_error(exc, "calibration")
             QMessageBox.critical(self, "Calibration Error", user_message)
             self._log(f"Calibration error: {user_message}")
@@ -1580,10 +1515,8 @@ class GUIManager(QMainWindow):
                 )
                 return
 
-            # Show current export directory in status
             self._log(show_file_location(output_dir, "Export destination"))
 
-            # Show progress dialog
             progress = QProgressBar()
             progress.setWindowTitle("Exporting Data...")
             progress.setRange(0, len(export_formats))
@@ -1602,7 +1535,6 @@ class GUIManager(QMainWindow):
                         )
                         exported_files.append(out_path)
                     elif fmt == "CSV":
-                        # Copy CSV files directly
                         import glob
                         import shutil
 
@@ -1614,7 +1546,6 @@ class GUIManager(QMainWindow):
 
                     progress.setValue(i + 1)
 
-                # Show completion message with clear file location
                 success_message = StatusIndicator.format_export_status(
                     output_dir, len(exported_files), export_formats
                 )
@@ -1628,7 +1559,6 @@ class GUIManager(QMainWindow):
                 progress.close()
 
         except Exception as exc:
-            # Use user-friendly error messages
             user_message = ErrorMessageTranslator.translate_error(exc, "recording")
             QMessageBox.critical(self, "Export Error", user_message)
             self._log(f"Export error: {user_message}")
@@ -1702,7 +1632,6 @@ class GUIManager(QMainWindow):
             tutorial_flag_file = os.path.join(os.getcwd(), ".tutorial_completed")
 
             if not os.path.exists(tutorial_flag_file):
-                # Show tutorial for first-time users
                 reply = QMessageBox.question(
                     self,
                     "Welcome!",
@@ -1720,10 +1649,93 @@ class GUIManager(QMainWindow):
                     with open(tutorial_flag_file, "w") as f:
                         f.write("Tutorial offered on first run")
                 except Exception:
-                    pass  # Ignore file creation errors
+                    pass
 
         except Exception:
-            pass  # Ignore errors in tutorial check - should not affect main app
+            pass
+
+    
+    @pyqtSlot(str, str, str, list)
+    def on_device_registered(self, device_id: str, device_name: str, device_type: str, capabilities: list):
+        """Handle device registration from TCP server."""
+        try:
+            self._log(f"Device registered: {device_name} ({device_type}) - {device_id}")
+            self.connected_devices.addItem(f"{device_name} ({device_type})")
+            self.btn_disconnect_device.setEnabled(True)
+            
+            if "video" in capabilities or "thermal" in capabilities:
+                widget_kind = "video" if "video" in capabilities else "thermal"
+                remote_widget = DeviceWidget(widget_kind, f"{device_name} ({device_type})", self)
+                self._add_to_grid(remote_widget)
+                self._remote_widgets[device_id] = remote_widget
+                
+        except Exception as exc:
+            self._log(f"Error handling device registration: {exc}")
+
+    @pyqtSlot(str, str, str, int, dict, str)  
+    def on_device_status_updated(self, device_id: str, status: str, session_id: str, 
+                                recording_progress: int, sensor_status: dict, error_message: str):
+        """Handle device status updates from TCP server."""
+        try:
+            if device_id in self._remote_widgets:
+                widget = self._remote_widgets[device_id]
+                if status == "recording":
+                    widget.set_recording_status(True, recording_progress)
+                elif status == "idle":
+                    widget.set_recording_status(False)
+                elif status == "error" and error_message:
+                    widget.set_error_status(error_message)
+                    
+            self._log(f"Device {device_id} status: {status}")
+            if error_message:
+                self._log(f"Device {device_id} error: {error_message}")
+                
+        except Exception as exc:
+            self._log(f"Error handling device status: {exc}")
+
+    @pyqtSlot(str, dict, float)
+    def on_live_gsr_data(self, device_id: str, gsr_data: dict, timestamp: float):
+        """Handle live GSR data from remote devices for real-time plotting."""
+        try:
+            widget_key = f"{device_id}_gsr"
+            if widget_key not in self._remote_widgets:
+                gsr_widget = DeviceWidget("gsr", f"Remote GSR ({device_id[:8]})", self)
+                self._add_to_grid(gsr_widget)
+                self._remote_widgets[widget_key] = gsr_widget
+                
+            gsr_value = gsr_data.get("gsr_microsiemens", 0.0)
+            ts_array = np.array([timestamp])
+            vals_array = np.array([gsr_value])
+            
+            self._remote_widgets[widget_key].append_gsr_samples(ts_array, vals_array)
+            
+        except Exception as exc:
+            self._log(f"Error handling live GSR data: {exc}")
+
+    @pyqtSlot(str, str, float)
+    def on_live_video_frame(self, device_id: str, frame_data: str, timestamp: float):
+        """Handle live video frames from remote devices."""
+        try:
+            if device_id in self._remote_widgets:
+                import base64
+                try:
+                    frame_bytes = base64.b64decode(frame_data)
+                    self._log(f"Received video frame from {device_id}: {len(frame_bytes)} bytes")
+                except Exception as exc:
+                    self._log(f"Failed to decode video frame from {device_id}: {exc}")
+                    
+        except Exception as exc:
+            self._log(f"Error handling live video: {exc}")
+
+    @pyqtSlot(str, str, float)
+    def on_live_thermal_frame(self, device_id: str, frame_data: str, timestamp: float):
+        """Handle live thermal frames from remote devices.""" 
+        try:
+            if device_id in self._remote_widgets:
+                self._log(f"Received thermal frame from {device_id}")
+                
+        except Exception as exc:
+            self._log(f"Error handling live thermal data: {exc}")
 
 
 class CalibrationDialog(QDialog):
@@ -1736,7 +1748,6 @@ class CalibrationDialog(QDialog):
 
         layout = QFormLayout(self)
 
-        # Images directory selection
         self.images_dir_edit = QLineEdit()
         self.images_browse_btn = QPushButton("Browse...")
         self.images_browse_btn.clicked.connect(self._browse_images_dir)
@@ -1764,7 +1775,6 @@ class CalibrationDialog(QDialog):
         self.square_size_spin.setSuffix(" m")
         layout.addRow("Square Size:", self.square_size_spin)
 
-        # Instructions
         instructions = QLabel(
             "Instructions:\n"
             "1. Select folder containing RGB and thermal image pairs\n"
@@ -1776,7 +1786,6 @@ class CalibrationDialog(QDialog):
         instructions.setStyleSheet("QLabel { color: gray; font-size: 10px; }")
         layout.addRow(instructions)
 
-        # Buttons
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -1810,7 +1819,6 @@ class ExportDialog(QDialog):
 
         layout = QFormLayout(self)
 
-        # Session directory selection
         self.session_dir_edit = QLineEdit()
         self.session_browse_btn = QPushButton("Browse...")
         self.session_browse_btn.clicked.connect(self._browse_session_dir)
@@ -1820,7 +1828,6 @@ class ExportDialog(QDialog):
         session_layout.addWidget(self.session_browse_btn)
         layout.addRow("Session Directory:", session_layout)
 
-        # Output directory selection
         self.output_dir_edit = QLineEdit()
         self.output_browse_btn = QPushButton("Browse...")
         self.output_browse_btn.clicked.connect(self._browse_output_dir)
@@ -1830,12 +1837,11 @@ class ExportDialog(QDialog):
         output_layout.addWidget(self.output_browse_btn)
         layout.addRow("Export Location:", output_layout)
 
-        # Format checkboxes
         self.hdf5_check = QCheckBox("HDF5 (Hierarchical Data Format)")
         self.csv_check = QCheckBox("CSV (Comma Separated Values)")
         self.mp4_check = QCheckBox("MP4 (Video Files)")
 
-        self.hdf5_check.setChecked(True)  # Default selection
+        self.hdf5_check.setChecked(True)
         self.csv_check.setChecked(True)
 
         format_layout = QVBoxLayout()
@@ -1844,7 +1850,6 @@ class ExportDialog(QDialog):
         format_layout.addWidget(self.mp4_check)
         layout.addRow("Export Formats:", format_layout)
 
-        # Instructions
         instructions = QLabel(
             "Export Instructions:\n"
             "• HDF5: Structured format for analysis tools (MATLAB, Python)\n"
@@ -1856,7 +1861,6 @@ class ExportDialog(QDialog):
         instructions.setStyleSheet("QLabel { color: gray; font-size: 10px; }")
         layout.addRow(instructions)
 
-        # Buttons
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -1898,7 +1902,6 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Settings")
         self.setFixedSize(500, 600)
 
-        # Main layout
         layout = QVBoxLayout(self)
 
         # Create tabbed interface for different settings categories
@@ -1917,7 +1920,6 @@ class SettingsDialog(QDialog):
         # Advanced Settings Tab
         self._create_advanced_tab(tabs)
 
-        # Buttons
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
@@ -1938,7 +1940,6 @@ class SettingsDialog(QDialog):
         general_tab = QWidget()
         layout = QFormLayout(general_tab)
 
-        # Data directory
         self.data_dir_edit = QLineEdit()
         self.data_dir_browse = QPushButton("Browse...")
         self.data_dir_browse.clicked.connect(self._browse_data_dir)
@@ -1948,7 +1949,6 @@ class SettingsDialog(QDialog):
         data_dir_layout.addWidget(self.data_dir_browse)
         layout.addRow("Data Directory:", data_dir_layout)
 
-        # Auto-start devices
         self.auto_start_webcam = QCheckBox("Auto-start local webcam")
         self.auto_start_shimmer = QCheckBox("Auto-start Shimmer sensor")
         layout.addRow("Device Startup:", self.auto_start_webcam)
@@ -1960,7 +1960,6 @@ class SettingsDialog(QDialog):
         layout.addRow("Interface:", self.show_first_time_guide)
         layout.addRow("", self.enable_tooltips)
 
-        # Theme selection
         self.theme_combo = QWidget()
         theme_layout = QHBoxLayout(self.theme_combo)
         theme_layout.setContentsMargins(0, 0, 0, 0)
@@ -2090,7 +2089,6 @@ class SettingsDialog(QDialog):
         export_layout.addWidget(self.export_mp4)
         layout.addRow("Default Export Formats:", self.default_export_format)
 
-        # Reset button
         reset_btn = QPushButton("Reset to Defaults")
         reset_btn.clicked.connect(self._reset_to_defaults)
         layout.addRow("", reset_btn)
@@ -2148,7 +2146,6 @@ class SettingsDialog(QDialog):
             # This would save settings to config file
             self._get_settings_dict()
 
-            # Show confirmation
             QMessageBox.information(
                 self,
                 "Settings Applied",
@@ -2164,25 +2161,21 @@ class SettingsDialog(QDialog):
     def _get_settings_dict(self) -> dict:
         """Get all settings as a dictionary."""
         return {
-            # General
             "data_directory": self.data_dir_edit.text(),
             "auto_start_webcam": self.auto_start_webcam.isChecked(),
             "auto_start_shimmer": self.auto_start_shimmer.isChecked(),
             "show_first_time_guide": self.show_first_time_guide.isChecked(),
-            # Network
             "discovery_port": self.discovery_port.value(),
             "connection_timeout": self.connection_timeout.value(),
             "use_tls": self.use_tls.isChecked(),
             "transfer_port": self.transfer_port.value(),
             "preview_fps_limit": self.preview_fps_limit.value(),
-            # Recording
             "shimmer_sampling_rate": self.shimmer_sampling_rate.value(),
             "use_real_shimmer": self.use_real_shimmer.isChecked(),
             "shimmer_port": self.shimmer_port.text(),
             "video_fps": self.video_fps.value(),
             "video_quality": self.video_quality.value(),
             "time_sync_interval": self.time_sync_interval.value(),
-            # Advanced
             "debug_logging": self.debug_logging.isChecked(),
             "verbose_ui": self.verbose_ui.isChecked(),
             "ui_update_interval": self.ui_update_interval.value(),
@@ -2191,20 +2184,17 @@ class SettingsDialog(QDialog):
 
     def _reset_to_defaults(self):
         """Reset all settings to default values."""
-        # General defaults
         self.data_dir_edit.setText("pc_controller_data")
         self.auto_start_webcam.setChecked(True)
         self.auto_start_shimmer.setChecked(True)
         self.show_first_time_guide.setChecked(True)
 
-        # Network defaults
         self.discovery_port.setValue(8888)
         self.connection_timeout.setValue(10)
         self.use_tls.setChecked(True)
         self.transfer_port.setValue(9001)
         self.preview_fps_limit.setValue(10)
 
-        # Recording defaults
         self.shimmer_sampling_rate.setValue(128)
         self.use_real_shimmer.setChecked(False)
         self.shimmer_port.setText("COM3")
@@ -2212,7 +2202,6 @@ class SettingsDialog(QDialog):
         self.video_quality.setValue(90)
         self.time_sync_interval.setValue(180)
 
-        # Advanced defaults
         self.debug_logging.setChecked(False)
         self.verbose_ui.setChecked(False)
         self.ui_update_interval.setValue(50)

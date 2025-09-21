@@ -23,7 +23,6 @@ except Exception:  # pragma: no cover
         return default
 
 
-# Try to import real Shimmer library
 try:
     import pyshimmer
 
@@ -72,7 +71,7 @@ class RealShimmer:
             # Enable GSR and PPG sensors
             enabled_sensors = (
                 pyshimmer.SENSOR_GSR
-                | pyshimmer.SENSOR_INT_A13  # PPG
+                | pyshimmer.SENSOR_INT_A13
                 | pyshimmer.SENSOR_TIMESTAMP
             )
 
@@ -80,9 +79,8 @@ class RealShimmer:
             self._shimmer.set_sampling_rate(self._rate)
 
             # Configure GSR range and resolution
-            self._shimmer.set_gsr_range(4)  # Max range for best resolution
+            self._shimmer.set_gsr_range(4)
 
-            # Connect to device
             if self._shimmer.connect():
                 self._connected = True
                 logger.info(f"Connected to Shimmer on {self._port}")
@@ -152,15 +150,11 @@ class RealShimmer:
             return
 
         try:
-            # Extract timestamp (convert to nanoseconds)
-            timestamp_ns = int(shimmer_data.timestamp * 1000000)  # ms to ns
+            timestamp_ns = int(shimmer_data.timestamp * 1000000)
 
-            # Extract GSR value and convert to microsiemens
-            # Using 12-bit ADC resolution as specified in requirements
             gsr_raw = shimmer_data.get("GSR", 0)
             gsr_microsiemens = self._convert_gsr_to_microsiemens(gsr_raw)
 
-            # Call the callback with processed data
             self._callback(timestamp_ns, gsr_microsiemens)
 
         except Exception as e:
@@ -172,19 +166,15 @@ class RealShimmer:
         Critical implementation note: Uses 12-bit ADC resolution (0-4095 range)
         as specified in project requirements, not 16-bit.
         """
-        # Constants for GSR conversion (Shimmer3 GSR+ unit)
-        ADC_RESOLUTION = 4095.0  # 12-bit ADC (not 16-bit)
-        GSR_RANGE_KOHM = 4000.0  # 4 MΩ range
+        ADC_RESOLUTION = 4095.0
+        GSR_RANGE_KOHM = 4000.0
         V_REF = 3.0  # Reference voltage
 
-        # Convert ADC value to voltage
         voltage = (raw_value / ADC_RESOLUTION) * V_REF
 
-        # Convert to conductance (microsiemens)
-        # GSR = 1/Resistance, where Resistance is proportional to voltage
-        if voltage > 0.01:  # Avoid division by zero
+        if voltage > 0.01:
             resistance_kohm = GSR_RANGE_KOHM * (V_REF - voltage) / voltage
-            conductance_us = 1000.0 / resistance_kohm  # Convert to microsiemens
+            conductance_us = 1000.0 / resistance_kohm
             return max(0.0, conductance_us)
         else:
             return 0.0
@@ -199,7 +189,6 @@ class SimulatedShimmer:
         self._running = threading.Event()
         self._callback: Callable[[int, float], None] | None = None
 
-    # Public API mirroring a real manager
     def connect(self) -> bool:
         return True
 
@@ -221,7 +210,6 @@ class SimulatedShimmer:
     def disconnect(self) -> None:
         self.stop_streaming()
 
-    # Internal
     def _loop(self) -> None:
         dt = 1.0 / float(self._rate)
         next_t = time.monotonic()
@@ -233,7 +221,6 @@ class SimulatedShimmer:
                 time.sleep(max(0.0, next_t - now))
                 continue
             ts_ns = time.monotonic_ns()
-            # Baseline 10 uS, 1.2 Hz sine, small noise
             val = 10.0 + 2.0 * math.sin(phase)
             phase = (phase + two_pi * 1.2 * dt) % two_pi
             cb = self._callback
@@ -283,7 +270,6 @@ class ShimmerManager:
     def initialize(self) -> bool:
         """Initialize Shimmer manager with automatic fallback."""
         try:
-            # Try real Shimmer first if preferred
             if self._prefer_real and SHIMMER_AVAILABLE:
                 try:
                     self._manager = RealShimmer(**self._kwargs)
@@ -302,7 +288,6 @@ class ShimmerManager:
                     )
                     self._manager = None
 
-            # Fall back to simulation
             self._manager = SimulatedShimmer(**self._kwargs)
             self._is_real = False
             if self._manager.connect():

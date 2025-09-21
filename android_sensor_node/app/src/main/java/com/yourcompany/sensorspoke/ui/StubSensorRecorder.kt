@@ -19,17 +19,14 @@ class StubSensorRecorder : SensorRecorder {
     override suspend fun start(sessionDir: File) {
         this.sessionDir = sessionDir
 
-        // Simulate sensor initialization delay
         delay(100)
 
-        // Create test files to verify session directory works
         val testFile = File(sessionDir, "stub_sensor_test.log")
         testFile.writeText("Stub sensor recording started at ${System.currentTimeMillis()}\n")
 
         isRecording = true
         Log.i(TAG, "Stub sensor started recording in: ${sessionDir.absolutePath}")
 
-        // Simulate ongoing data writing
         val dataFile = File(sessionDir, "stub_data.csv")
         dataFile.writeText("timestamp,value\n")
         dataFile.appendText("${System.currentTimeMillis()},42.0\n")
@@ -38,7 +35,6 @@ class StubSensorRecorder : SensorRecorder {
     override suspend fun stop() {
         if (!isRecording) return
 
-        // Simulate cleanup delay
         delay(50)
 
         sessionDir?.let { dir ->

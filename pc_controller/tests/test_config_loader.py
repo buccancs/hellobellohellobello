@@ -16,14 +16,12 @@ def test_config_loader_reads_env_path_and_get(tmp_path, monkeypatch):
     }
     p.write_text(json.dumps(data), encoding="utf-8")
 
-    # Point loader to this file
     monkeypatch.setenv("PC_CONFIG_PATH", str(p))
     cfg.reload_config()
 
     loaded = cfg.get_config()
     assert loaded["server_ip"] == "127.0.0.1"
     assert loaded["timesync_port"] == 9999
-    # Unknown keys use default
     assert cfg.get("missing", 42) == 42
 
 
@@ -33,4 +31,4 @@ def test_config_loader_missing_file_returns_empty(tmp_path, monkeypatch):
     cfg.reload_config()
     loaded = cfg.get_config()
     assert isinstance(loaded, dict)
-    assert loaded == {}  # empty on missing or malformed
+    assert loaded == {}

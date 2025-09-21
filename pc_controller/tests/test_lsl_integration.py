@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-# Mock pylsl if not available
 with patch.dict('sys.modules', {'pylsl': MagicMock()}):
     from pc_controller.src.network.lsl_integration import LSLOutletManager
 
@@ -20,8 +19,6 @@ class TestLSLOutletManager:
     @patch('pc_controller.src.network.lsl_integration.LSL_AVAILABLE', True)
     def test_initialization_enabled(self, mock_pylsl):
         """Test LSL manager initialization when enabled."""
-        # Need to patch the cfg_get function that's actually being used
-        # In case of import failure, the fallback function is used
         import pc_controller.src.network.lsl_integration as lsl_module
 
         def mock_cfg_get(key: str, default=None):
@@ -29,7 +26,6 @@ class TestLSLOutletManager:
                 return "true"
             return default
 
-        # Replace the cfg_get function directly
         original_cfg_get = lsl_module.cfg_get
         lsl_module.cfg_get = mock_cfg_get
 
@@ -63,7 +59,6 @@ class TestLSLOutletManager:
         with patch('pc_controller.src.network.lsl_integration.cfg_get') as mock_cfg:
             mock_cfg.return_value = "true"
 
-            # Mock pylsl components
             mock_info = MagicMock()
             mock_desc = MagicMock()
             mock_channels = MagicMock()
@@ -96,7 +91,6 @@ class TestLSLOutletManager:
         with patch('pc_controller.src.network.lsl_integration.cfg_get') as mock_cfg:
             mock_cfg.return_value = "true"
 
-            # Mock pylsl components
             mock_info = MagicMock()
             mock_desc = MagicMock()
 
@@ -113,7 +107,6 @@ class TestLSLOutletManager:
             assert result is True
             assert "Thermal_device_001" in manager._outlets
 
-            # Check that channel count is width * height
             expected_channels = 256 * 192
             mock_pylsl.StreamInfo.assert_called_with(
                 name="Thermal Camera - device_001",
@@ -132,7 +125,6 @@ class TestLSLOutletManager:
         with patch('pc_controller.src.network.lsl_integration.cfg_get') as mock_cfg:
             mock_cfg.return_value = "true"
 
-            # Setup mocks
             mock_outlet = MagicMock()
             mock_pylsl.StreamInfo.return_value = MagicMock()
             mock_pylsl.StreamOutlet.return_value = mock_outlet
@@ -141,7 +133,6 @@ class TestLSLOutletManager:
             manager = LSLOutletManager()
             manager.create_gsr_outlet("device_001", 50.0)
 
-            # Test streaming sample
             result = manager.stream_gsr_sample("device_001", 25.5, 1024)
             assert result is True
             mock_outlet.push_sample.assert_called_once_with([25.5, 1024])
@@ -154,7 +145,6 @@ class TestLSLOutletManager:
         with patch('pc_controller.src.network.lsl_integration.cfg_get') as mock_cfg:
             mock_cfg.return_value = "true"
 
-            # Setup mocks
             mock_outlet = MagicMock()
             mock_pylsl.StreamInfo.return_value = MagicMock()
             mock_pylsl.StreamOutlet.return_value = mock_outlet
@@ -163,7 +153,6 @@ class TestLSLOutletManager:
             manager = LSLOutletManager()
             manager.create_gsr_outlet("device_001", 50.0)
 
-            # Test streaming sample with timestamp
             timestamp = 1234567890.5
             result = manager.stream_gsr_sample("device_001", 25.5, 1024, timestamp)
             assert result is True
@@ -177,16 +166,14 @@ class TestLSLOutletManager:
         with patch('pc_controller.src.network.lsl_integration.cfg_get') as mock_cfg:
             mock_cfg.return_value = "true"
 
-            # Setup mocks
             mock_outlet = MagicMock()
             mock_pylsl.StreamInfo.return_value = MagicMock()
             mock_pylsl.StreamOutlet.return_value = mock_outlet
             mock_pylsl.cf_float32 = "float32"
 
             manager = LSLOutletManager()
-            manager.create_thermal_outlet("device_001", 4, 4, 10.0)  # Small frame for testing
+            manager.create_thermal_outlet("device_001", 4, 4, 10.0)
 
-            # Create test frame
             frame = np.array(
                 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
                 dtype=np.float32,
@@ -195,7 +182,6 @@ class TestLSLOutletManager:
             result = manager.stream_thermal_frame("device_001", frame)
             assert result is True
 
-            # Check that frame was flattened
             expected_flattened = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
             mock_outlet.push_sample.assert_called_once_with(expected_flattened)
 
@@ -207,7 +193,6 @@ class TestLSLOutletManager:
         with patch('pc_controller.src.network.lsl_integration.cfg_get') as mock_cfg:
             mock_cfg.return_value = "true"
 
-            # Setup mocks
             mock_pylsl.StreamInfo.return_value = MagicMock()
             mock_pylsl.StreamOutlet.return_value = MagicMock()
             mock_pylsl.cf_float32 = "float32"
@@ -217,7 +202,6 @@ class TestLSLOutletManager:
 
             assert "GSR_device_001" in manager._outlets
 
-            # Remove outlet
             result = manager.remove_outlet("device_001", "GSR")
             assert result is True
             assert "GSR_device_001" not in manager._outlets
@@ -230,7 +214,6 @@ class TestLSLOutletManager:
         with patch('pc_controller.src.network.lsl_integration.cfg_get') as mock_cfg:
             mock_cfg.return_value = "true"
 
-            # Setup mocks
             mock_pylsl.StreamInfo.return_value = MagicMock()
             mock_pylsl.StreamOutlet.return_value = MagicMock()
             mock_pylsl.cf_float32 = "float32"

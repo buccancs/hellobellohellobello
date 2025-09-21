@@ -106,7 +106,6 @@ class LSLOutletManager:
                 channel_units=["microsiemens", "raw"],
             )
 
-            # Create stream info
             info = pylsl.StreamInfo(
                 name=config.name,
                 type=config.type,
@@ -116,7 +115,6 @@ class LSLOutletManager:
                 source_id=config.source_id,
             )
 
-            # Add channel metadata
             channels = info.desc().append_child("channels")
             for _, (name, unit) in enumerate(
                 zip(config.channel_names, config.channel_units, strict=True)
@@ -126,11 +124,9 @@ class LSLOutletManager:
                 ch.append_child_value("unit", unit)
                 ch.append_child_value("type", config.type)
 
-            # Add device metadata
             info.desc().append_child_value("manufacturer", "Shimmer")
             info.desc().append_child_value("device_id", device_id)
 
-            # Create outlet
             outlet = pylsl.StreamOutlet(info)
             self._outlets[outlet_name] = outlet
             self._configs[outlet_name] = config
@@ -166,7 +162,6 @@ class LSLOutletManager:
         outlet_name = f"Thermal_{device_id}"
 
         try:
-            # Thermal frames are streamed as flattened arrays
             channel_count = width * height
 
             config = LSLStreamConfig(
@@ -180,7 +175,6 @@ class LSLOutletManager:
                 channel_units=["celsius"] * channel_count,
             )
 
-            # Create stream info
             info = pylsl.StreamInfo(
                 name=config.name,
                 type=config.type,
@@ -190,14 +184,12 @@ class LSLOutletManager:
                 source_id=config.source_id,
             )
 
-            # Add metadata
             info.desc().append_child_value("manufacturer", "Topdon")
             info.desc().append_child_value("model", "TC001")
             info.desc().append_child_value("device_id", device_id)
             info.desc().append_child_value("frame_width", str(width))
             info.desc().append_child_value("frame_height", str(height))
 
-            # Create outlet
             outlet = pylsl.StreamOutlet(info)
             self._outlets[outlet_name] = outlet
             self._configs[outlet_name] = config
@@ -271,7 +263,6 @@ class LSLOutletManager:
 
         try:
             outlet = self._outlets[outlet_name]
-            # Flatten frame for LSL transmission
             flattened = frame.flatten().astype(np.float32)
 
             if timestamp is not None:
@@ -299,7 +290,6 @@ class LSLOutletManager:
 
         if outlet_name in self._outlets:
             try:
-                # LSL outlets are automatically cleaned up when deleted
                 del self._outlets[outlet_name]
                 del self._configs[outlet_name]
                 logger.info(f"Removed LSL {sensor_type} outlet for device {device_id}")
@@ -332,7 +322,6 @@ class LSLOutletManager:
             logger.error(f"Error during LSL shutdown: {e}")
 
 
-# Global instance for easy access
 _lsl_manager: LSLOutletManager | None = None
 
 

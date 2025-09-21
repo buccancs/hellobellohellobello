@@ -21,7 +21,6 @@ class RecordingControllerComprehensiveTest {
     private lateinit var sessionsRoot: File
     private lateinit var recordingController: RecordingController
 
-    // Test sensor recorders
     private class TestSensorRecorder(
         private val name: String,
     ) : SensorRecorder {
@@ -79,7 +78,6 @@ class RecordingControllerComprehensiveTest {
 
             val sessionId = "single_sensor_test"
 
-            // Start recording
             recordingController.startSession(sessionId)
 
             assertEquals(RecordingController.State.RECORDING, recordingController.state.value)
@@ -88,7 +86,6 @@ class RecordingControllerComprehensiveTest {
             assertNotNull(sensor.startedDir)
             assertTrue(sensor.startedDir!!.exists())
 
-            // Stop recording
             recordingController.stopSession()
 
             assertEquals(RecordingController.State.IDLE, recordingController.state.value)
@@ -110,15 +107,12 @@ class RecordingControllerComprehensiveTest {
 
             val sessionId = "multi_sensor_test"
 
-            // Start recording
             recordingController.startSession(sessionId)
 
-            // Verify all sensors started
             assertTrue(sensor1.isStarted)
             assertTrue(sensor2.isStarted)
             assertTrue(sensor3.isStarted)
 
-            // Verify each sensor has its own directory
             assertNotNull(sensor1.startedDir)
             assertNotNull(sensor2.startedDir)
             assertNotNull(sensor3.startedDir)
@@ -127,10 +121,8 @@ class RecordingControllerComprehensiveTest {
             assertTrue(sensor2.startedDir!!.name.contains("sensor_2"))
             assertTrue(sensor3.startedDir!!.name.contains("sensor_3"))
 
-            // Stop recording
             recordingController.stopSession()
 
-            // Verify all sensors stopped
             assertFalse(sensor1.isStarted)
             assertFalse(sensor2.isStarted)
             assertFalse(sensor3.isStarted)
@@ -149,12 +141,10 @@ class RecordingControllerComprehensiveTest {
             val sessionId = "directory_structure_test"
             recordingController.startSession(sessionId)
 
-            // Verify session directory exists
             val sessionDir = File(sessionsRoot, sessionId)
             assertTrue("Session directory should exist", sessionDir.exists())
             assertTrue("Session directory should be a directory", sessionDir.isDirectory)
 
-            // Verify sensor subdirectory exists
             val sensorDir = File(sessionDir, "directory_test_sensor")
             assertTrue("Sensor directory should exist", sensorDir.exists())
             assertTrue("Sensor directory should be a directory", sensorDir.isDirectory)
@@ -171,12 +161,10 @@ class RecordingControllerComprehensiveTest {
             recordingController.startSession("first_session")
             assertEquals(RecordingController.State.RECORDING, recordingController.state.value)
 
-            // Attempting to start another session should fail
             assertThrows(IllegalStateException::class.java) {
                 runTest { recordingController.startSession("second_session") }
             }
 
-            // First session should still be active
             assertEquals("first_session", recordingController.currentSessionId.value)
             assertEquals(RecordingController.State.RECORDING, recordingController.state.value)
 
@@ -186,7 +174,6 @@ class RecordingControllerComprehensiveTest {
     @Test
     fun `can stop session when idle without error`() =
         runTest {
-            // Should not throw exception when stopping in idle state
             assertEquals(RecordingController.State.IDLE, recordingController.state.value)
             recordingController.stopSession()
             assertEquals(RecordingController.State.IDLE, recordingController.state.value)
@@ -203,17 +190,11 @@ class RecordingControllerComprehensiveTest {
             recordingController.register("failing_sensor", failingSensor)
             recordingController.register("working_sensor", workingSensor)
 
-            // Starting session with failing sensor should handle gracefully
             try {
                 recordingController.startSession("failure_test")
-                // The implementation may or may not throw - test should handle both cases
             } catch (e: Exception) {
-                // If it throws, verify state remains consistent
-                // Implementation detail - some controllers might handle gracefully
             }
 
-            // Working sensor should not be affected by other sensor's failure
-            // (This depends on implementation - some might roll back all sensors)
             recordingController.stopSession()
         }
 
@@ -231,17 +212,13 @@ class RecordingControllerComprehensiveTest {
             assertTrue(failingSensor.isStarted)
             assertTrue(workingSensor.isStarted)
 
-            // Set one sensor to fail on stop
             failingSensor.shouldFailOnStop = true
 
-            // Stopping should handle gracefully
             try {
                 recordingController.stopSession()
             } catch (e: Exception) {
-                // Some implementations might throw, others might handle gracefully
             }
 
-            // State should be consistent regardless
             assertEquals(RecordingController.State.IDLE, recordingController.state.value)
         }
 
@@ -252,11 +229,10 @@ class RecordingControllerComprehensiveTest {
             val sensor2 = TestSensorRecorder("replacement_sensor")
 
             recordingController.register("test_sensor", sensor1)
-            recordingController.register("test_sensor", sensor2) // Replace
+            recordingController.register("test_sensor", sensor2)
 
             recordingController.startSession("duplicate_test")
 
-            // Only the replacement sensor should be started
             assertFalse(sensor1.isStarted)
             assertTrue(sensor2.isStarted)
 
@@ -272,12 +248,10 @@ class RecordingControllerComprehensiveTest {
             recordingController.register("sensor_1", sensor1)
             recordingController.register("sensor_2", sensor2)
 
-            // Unregister one sensor
             recordingController.unregister("sensor_1")
 
             recordingController.startSession("unregister_test")
 
-            // Only sensor_2 should start
             assertFalse(sensor1.isStarted)
             assertTrue(sensor2.isStarted)
 
@@ -290,7 +264,6 @@ class RecordingControllerComprehensiveTest {
             val sensor = TestSensorRecorder("empty_session_sensor")
             recordingController.register("empty_session_sensor", sensor)
 
-            // Empty session ID should be handled
             recordingController.startSession("")
 
             assertEquals(RecordingController.State.RECORDING, recordingController.state.value)
@@ -312,7 +285,6 @@ class RecordingControllerComprehensiveTest {
             assertEquals(specialSessionId, recordingController.currentSessionId.value)
             assertTrue(sensor.isStarted)
 
-            // Directory should be created (may be sanitized)
             val sessionDirs = sessionsRoot.listFiles()?.filter { it.isDirectory }
             assertNotNull(sessionDirs)
             assertTrue("Should have at least one session directory", sessionDirs!!.isNotEmpty())
@@ -326,18 +298,15 @@ class RecordingControllerComprehensiveTest {
             val sensor = TestSensorRecorder("concurrent_sensor")
             recordingController.register("concurrent_sensor", sensor)
 
-            // Start session
             recordingController.startSession("concurrent_test")
             assertTrue(sensor.isStarted)
 
-            // Multiple stop calls should be safe
             recordingController.stopSession()
             recordingController.stopSession()
             recordingController.stopSession()
 
             assertEquals(RecordingController.State.IDLE, recordingController.state.value)
             assertFalse(sensor.isStarted)
-            // Stop should only be called once
             assertEquals(1, sensor.stopCount)
         }
 
@@ -347,21 +316,16 @@ class RecordingControllerComprehensiveTest {
             val sensor = TestSensorRecorder("atomic_sensor")
             recordingController.register("atomic_sensor", sensor)
 
-            // Initial state
             assertEquals(RecordingController.State.IDLE, recordingController.state.value)
             assertNull(recordingController.currentSessionId.value)
 
-            // Start recording
             recordingController.startSession("atomic_test")
 
-            // State should change immediately and atomically
             assertEquals(RecordingController.State.RECORDING, recordingController.state.value)
             assertEquals("atomic_test", recordingController.currentSessionId.value)
 
-            // Stop recording
             recordingController.stopSession()
 
-            // State should change back immediately
             assertEquals(RecordingController.State.IDLE, recordingController.state.value)
             assertNull(recordingController.currentSessionId.value)
         }
@@ -369,7 +333,6 @@ class RecordingControllerComprehensiveTest {
     @Test
     fun `recording with no registered sensors`() =
         runTest {
-            // Should handle case where no sensors are registered
             recordingController.startSession("no_sensors_test")
 
             assertEquals(RecordingController.State.RECORDING, recordingController.state.value)
@@ -386,7 +349,7 @@ class RecordingControllerComprehensiveTest {
             val sensor = TestSensorRecorder("long_id_sensor")
             recordingController.register("long_id_sensor", sensor)
 
-            val longSessionId = "a".repeat(1000) // Very long session ID
+            val longSessionId = "a".repeat(1000)
             recordingController.startSession(longSessionId)
 
             assertEquals(longSessionId, recordingController.currentSessionId.value)
@@ -423,7 +386,6 @@ class RecordingControllerComprehensiveTest {
             val sensor = TestSensorRecorder("rapid_cycle_sensor")
             recordingController.register("rapid_cycle_sensor", sensor)
 
-            // Perform rapid start/stop cycles
             repeat(10) { cycle ->
                 val sessionId = "rapid_cycle_$cycle"
 
@@ -436,7 +398,6 @@ class RecordingControllerComprehensiveTest {
                 assertFalse(sensor.isStarted)
             }
 
-            // Verify all cycles completed
             assertEquals(10, sensor.stopCount)
         }
 }

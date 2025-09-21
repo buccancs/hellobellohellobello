@@ -28,7 +28,6 @@ class SensorRecorderComprehensiveTest {
         sessionDir = File(tempDir, "test_session").apply { mkdirs() }
     }
 
-    // Test implementation of SensorRecorder for comprehensive testing
     private class TestSensorRecorder : SensorRecorder {
         var isStarted = false
         var sessionDirectory: File? = null
@@ -72,18 +71,15 @@ class SensorRecorderComprehensiveTest {
         runTest {
             val recorder = TestSensorRecorder()
 
-            // Initial state
             assertFalse(recorder.isStarted)
             assertNull(recorder.sessionDirectory)
             assertFalse(recorder.stopCalled)
 
-            // Start recording
             recorder.start(sessionDir)
             assertTrue(recorder.isStarted)
             assertEquals(sessionDir, recorder.sessionDirectory)
             assertEquals(1, recorder.startCallCount.get())
 
-            // Stop recording
             recorder.stop()
             assertFalse(recorder.isStarted)
             assertTrue(recorder.stopCalled)
@@ -95,7 +91,6 @@ class SensorRecorderComprehensiveTest {
         runTest {
             val recorder = TestSensorRecorder()
 
-            // Multiple start calls
             recorder.start(sessionDir)
             recorder.start(sessionDir)
             recorder.start(sessionDir)
@@ -112,7 +107,6 @@ class SensorRecorderComprehensiveTest {
 
             recorder.start(sessionDir)
 
-            // Multiple stop calls
             recorder.stop()
             recorder.stop()
             recorder.stop()
@@ -132,7 +126,6 @@ class SensorRecorderComprehensiveTest {
                 recorder.start(sessionDir)
             }
 
-            // State should remain consistent after failure
             assertFalse(recorder.isStarted)
             assertNull(recorder.sessionDirectory)
             assertEquals(1, recorder.startCallCount.get())
@@ -150,7 +143,6 @@ class SensorRecorderComprehensiveTest {
                 recorder.stop()
             }
 
-            // Stop attempt should be recorded even on failure
             assertEquals(1, recorder.stopCallCount.get())
         }
 
@@ -162,11 +154,9 @@ class SensorRecorderComprehensiveTest {
             val sessionDir1 = File(tempDir, "session1").apply { mkdirs() }
             val sessionDir2 = File(tempDir, "session2").apply { mkdirs() }
 
-            // Start with first directory
             recorder.start(sessionDir1)
             assertEquals(sessionDir1, recorder.sessionDirectory)
 
-            // Start with different directory (simulating session change)
             recorder.start(sessionDir2)
             assertEquals(sessionDir2, recorder.sessionDirectory)
         }
@@ -177,7 +167,6 @@ class SensorRecorderComprehensiveTest {
             val recorder = TestSensorRecorder()
             val nonExistentDir = File(tempDir, "non_existent")
 
-            // Should handle non-existent directory gracefully
             recorder.start(nonExistentDir)
 
             assertTrue(recorder.isStarted)
@@ -189,7 +178,6 @@ class SensorRecorderComprehensiveTest {
         runTest {
             val recorder = TestSensorRecorder()
 
-            // Simulate concurrent start/stop operations
             recorder.start(sessionDir)
             recorder.stop()
             recorder.start(sessionDir)
@@ -229,20 +217,15 @@ class ShimmerRecorderComprehensiveTest {
             try {
                 recorder.start(sessionDir)
 
-                // Verify session directory exists
                 assertTrue("Session directory should exist", sessionDir.exists())
                 assertTrue("Session directory should be a directory", sessionDir.isDirectory)
 
                 // Note: In a real test environment without actual Shimmer hardware,
-                // we would expect graceful handling of missing hardware
             } catch (e: Exception) {
-                // Expected in test environment without actual Shimmer device
-                // The test verifies the interface and basic structure
             } finally {
                 try {
                     recorder.stop()
                 } catch (e: Exception) {
-                    // Expected without real hardware
                 }
             }
         }
@@ -252,12 +235,9 @@ class ShimmerRecorderComprehensiveTest {
         runTest {
             val recorder = ShimmerRecorder(mockContext)
 
-            // Should handle stop without start gracefully
             try {
                 recorder.stop()
-                // If no exception, test passes
             } catch (e: Exception) {
-                // Some implementations might throw, verify it's handled appropriately
                 assertTrue("Exception should be handled gracefully", e.message != null)
             }
         }
@@ -272,10 +252,8 @@ class ShimmerRecorderComprehensiveTest {
 
                 try {
                     recorder.start(cycleSessionDir)
-                    // Brief "recording" period
                     recorder.stop()
                 } catch (e: Exception) {
-                    // Expected without real hardware - verify graceful handling
                 }
             }
         }
@@ -285,15 +263,12 @@ class ShimmerRecorderComprehensiveTest {
         runTest {
             val recorder = ShimmerRecorder(mockContext)
 
-            // Use a file as directory (invalid)
             val invalidDir = File(tempDir, "invalid_file.txt")
             invalidDir.createNewFile()
 
             try {
                 recorder.start(invalidDir)
-                // Should handle invalid directory gracefully
             } catch (e: Exception) {
-                // Expected - should provide meaningful error
                 assertTrue(
                     "Error message should be descriptive",
                     e.message?.contains("directory") == true ||
@@ -303,7 +278,6 @@ class ShimmerRecorderComprehensiveTest {
                 try {
                     recorder.stop()
                 } catch (e: Exception) {
-                    // Expected cleanup
                 }
             }
         }

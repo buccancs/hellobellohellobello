@@ -53,7 +53,6 @@ class RgbDataProcessorTest {
         assertEquals("Filename should match", "test_frame.jpg", frameData.filename)
         assertEquals("File size should be 0 for non-existent file", 0L, frameData.fileSizeBytes)
 
-        // Video relative time should be calculated correctly
         val expectedVideoRelativeTime = ((timestampNs - actualVideoStartTime) / 1_000_000).toInt()
         assertEquals("Video relative time should be calculated correctly", expectedVideoRelativeTime, frameData.videoRelativeTimeMs)
     }
@@ -89,7 +88,7 @@ class RgbDataProcessorTest {
     @Test
     fun testSyncQualityCalculationWithVideoTiming() {
         val videoBaseTime = 1000000000L
-        val frameTimestamp = videoBaseTime + 33333333L // Exactly one frame interval at 30 FPS
+        val frameTimestamp = videoBaseTime + 33333333L
 
         val syncQuality = dataProcessor.calculateSyncQuality(frameTimestamp, videoBaseTime)
         assertTrue("Sync quality should be high for perfect timing", syncQuality > 0.95)
@@ -98,7 +97,7 @@ class RgbDataProcessorTest {
     @Test
     fun testSyncQualityCalculationWithPoorTiming() {
         val videoBaseTime = 1000000000L
-        val frameTimestamp = videoBaseTime + 16666666L // Half frame interval, poor timing
+        val frameTimestamp = videoBaseTime + 16666666L
 
         val syncQuality = dataProcessor.calculateSyncQuality(frameTimestamp, videoBaseTime)
         assertTrue("Sync quality should be lower for poor timing", syncQuality < 0.8)

@@ -24,8 +24,7 @@ class TimeManagerComprehensiveTest {
         val timestamp = timeManager.getCurrentTimeNanos()
         assertTrue("Timestamp should be positive", timestamp > 0)
 
-        // Should be reasonable (after year 2000)
-        val year2000Nanos = 946684800000000000L // Jan 1, 2000 in nanoseconds
+        val year2000Nanos = 946684800000000000L
         assertTrue("Timestamp should be after year 2000", timestamp > year2000Nanos)
     }
 
@@ -35,10 +34,9 @@ class TimeManagerComprehensiveTest {
 
         repeat(10) {
             timestamps.add(timeManager.getCurrentTimeNanos())
-            Thread.sleep(1) // Small delay to ensure different timestamps
+            Thread.sleep(1)
         }
 
-        // Verify timestamps are generally increasing (monotonic)
         for (i in 1 until timestamps.size) {
             assertTrue(
                 "Timestamp $i should be >= previous",
@@ -52,10 +50,8 @@ class TimeManagerComprehensiveTest {
         val timestamp1 = timeManager.getCurrentTimeNanos()
         val timestamp2 = timeManager.getCurrentTimeNanos()
 
-        // Even consecutive calls might have different nanosecond values
-        // This tests that we're getting nanosecond precision
         val difference = Math.abs(timestamp2 - timestamp1)
-        assertTrue("Should have nanosecond precision", difference < 1000000000L) // Less than 1 second
+        assertTrue("Should have nanosecond precision", difference < 1000000000L)
     }
 
     @Test
@@ -66,7 +62,6 @@ class TimeManagerComprehensiveTest {
         assertNotNull("Formatted timestamp should not be null", formatted)
         assertTrue("Formatted timestamp should not be empty", formatted.isNotEmpty())
 
-        // Should contain typical timestamp elements
         assertTrue(
             "Should contain date/time elements",
             formatted.contains("-") || formatted.contains(":") || formatted.contains("T"),
@@ -75,8 +70,8 @@ class TimeManagerComprehensiveTest {
 
     @Test
     fun `calculateOffset computes correct time difference`() {
-        val baseTime = 1000000000L // 1 second in nanoseconds
-        val offset = 500000000L // 0.5 seconds
+        val baseTime = 1000000000L
+        val offset = 500000000L
 
         val result = timeManager.calculateOffset(baseTime, baseTime + offset)
         assertEquals("Offset should be calculated correctly", offset, result)
@@ -92,10 +87,8 @@ class TimeManagerComprehensiveTest {
 
         timeManager.synchronizeWith(referenceTime)
 
-        // After synchronization, getSynchronizedTime should reflect the adjustment
         val synchronizedTime = timeManager.getSynchronizedTime()
 
-        // The exact assertion depends on implementation details
         assertNotNull("Synchronized time should not be null", synchronizedTime)
         assertTrue("Synchronized time should be reasonable", synchronizedTime > 0)
     }
@@ -115,24 +108,20 @@ class TimeManagerComprehensiveTest {
         timeManager.synchronizeWith(time3)
         val sync3 = timeManager.getSynchronizedTime()
 
-        // Each synchronization should update the internal state
         assertNotEquals("Second sync should differ from first", sync1, sync2)
         assertNotEquals("Third sync should differ from second", sync2, sync3)
     }
 
     @Test
     fun `edge case timestamps handle correctly`() {
-        // Test with very small timestamp
         val smallTime = 1L
         val smallFormatted = timeManager.formatTimestamp(smallTime)
         assertNotNull("Small timestamp should format", smallFormatted)
 
-        // Test with zero timestamp
         val zeroFormatted = timeManager.formatTimestamp(0L)
         assertNotNull("Zero timestamp should format", zeroFormatted)
 
-        // Test with large timestamp (far future)
-        val largeTime = Long.MAX_VALUE / 2 // Avoid overflow
+        val largeTime = Long.MAX_VALUE / 2
         val largeFormatted = timeManager.formatTimestamp(largeTime)
         assertNotNull("Large timestamp should format", largeFormatted)
     }
@@ -140,17 +129,16 @@ class TimeManagerComprehensiveTest {
     @Test
     fun `time difference calculations are accurate`() {
         val startTime = timeManager.getCurrentTimeNanos()
-        Thread.sleep(10) // 10ms delay
+        Thread.sleep(10)
         val endTime = timeManager.getCurrentTimeNanos()
 
         val difference = timeManager.calculateOffset(endTime, startTime)
 
-        // Should be approximately 10ms (10,000,000 nanoseconds)
         assertTrue("Difference should be positive", difference > 0)
         assertTrue(
             "Difference should be reasonable for 10ms",
             difference > 5_000_000 && difference < 50_000_000,
-        ) // 5ms to 50ms range
+        )
     }
 
     @Test
@@ -159,7 +147,6 @@ class TimeManagerComprehensiveTest {
             val timestamps = mutableListOf<Long>()
             val jobs = mutableListOf<kotlinx.coroutines.Job>()
 
-            // Launch multiple concurrent coroutines
             repeat(100) {
                 val job =
                     kotlinx.coroutines.launch {
@@ -168,13 +155,10 @@ class TimeManagerComprehensiveTest {
                 jobs.add(job)
             }
 
-            // Wait for all jobs to complete
             jobs.forEach { it.join() }
 
-            // Should have 100 timestamps
             assertEquals("Should have 100 timestamps", 100, timestamps.size)
 
-            // All timestamps should be valid
             timestamps.forEach { timestamp ->
                 assertTrue("Each timestamp should be positive", timestamp > 0)
             }
@@ -182,12 +166,10 @@ class TimeManagerComprehensiveTest {
 
     @Test
     fun `sync offset calculation edge cases`() {
-        // Test with same timestamps (zero offset)
         val sameTime = 1000000000L
         val zeroOffset = timeManager.calculateOffset(sameTime, sameTime)
         assertEquals("Same timestamps should have zero offset", 0L, zeroOffset)
 
-        // Test with maximum safe values
         val maxTime = Long.MAX_VALUE / 2
         val minTime = 1000000000L
         val maxOffset = timeManager.calculateOffset(maxTime, minTime)
@@ -207,9 +189,7 @@ class PreviewBusComprehensiveTest {
     fun `preview bus initialization`() {
         assertNotNull("PreviewBus should initialize", previewBus)
 
-        // Initial state should be reasonable
         val initialFrame = previewBus.getCurrentFrame()
-        // May be null initially, which is valid
     }
 
     @Test
@@ -233,7 +213,6 @@ class PreviewBusComprehensiveTest {
         previewBus.publishFrame(frame2)
         previewBus.publishFrame(frame3)
 
-        // Should get the most recent frame
         val currentFrame = previewBus.getCurrentFrame()
         assertNotNull("Should have current frame", currentFrame)
         assertArrayEquals("Should get most recent frame", frame3, currentFrame)
@@ -252,7 +231,7 @@ class PreviewBusComprehensiveTest {
 
     @Test
     fun `large frame handling`() {
-        val largeFrame = ByteArray(1024 * 1024) { (it % 256).toByte() } // 1MB frame
+        val largeFrame = ByteArray(1024 * 1024) { (it % 256).toByte() }
 
         previewBus.publishFrame(largeFrame)
 
@@ -264,14 +243,10 @@ class PreviewBusComprehensiveTest {
 
     @Test
     fun `null frame handling`() {
-        // Test behavior with null frame (if implementation allows)
         try {
             previewBus.publishFrame(null)
-            // If no exception, verify behavior
             val frame = previewBus.getCurrentFrame()
-            // Implementation-dependent: might be null or empty
         } catch (e: Exception) {
-            // If implementation throws on null, that's also valid
             assertTrue(
                 "Exception for null frame should be meaningful",
                 e.message?.contains("null") == true,
@@ -290,7 +265,7 @@ class PreviewBusComprehensiveTest {
             val publishJobs =
                 frames.mapIndexed { index, frame ->
                     launch {
-                        delay(index.toLong()) // Stagger publishing
+                        delay(index.toLong())
                         previewBus.publishFrame(frame)
                     }
                 }
@@ -303,11 +278,9 @@ class PreviewBusComprehensiveTest {
                     }
                 }
 
-            // Wait for all operations to complete
             publishJobs.forEach { it.join() }
             retrieveJobs.forEach { it.join() }
 
-            // Final frame should be available
             val finalFrame = previewBus.getCurrentFrame()
             assertNotNull("Final frame should be available", finalFrame)
         }
@@ -317,7 +290,6 @@ class PreviewBusComprehensiveTest {
         var notificationCount = 0
         var lastFrame: ByteArray? = null
 
-        // Register subscriber (if supported by implementation)
         try {
             previewBus.subscribe { frame, timestamp ->
                 notificationCount++
@@ -327,13 +299,11 @@ class PreviewBusComprehensiveTest {
             val testFrame = ByteArray(20) { it.toByte() }
             previewBus.publishFrame(testFrame)
 
-            // Give time for notification
             Thread.sleep(10)
 
             assertEquals("Should receive one notification", 1, notificationCount)
             assertContentEquals(testFrame, lastFrame, "Notified frame should match")
         } catch (e: NoSuchMethodError) {
-            // If subscribe method doesn't exist, this is expected in current implementation
             println("PreviewBus subscribe method not yet implemented - test skipped")
             assertTrue("Test marked as skipped due to missing implementation", true)
         }
@@ -351,29 +321,25 @@ class PreviewBusComprehensiveTest {
         val endTime = System.currentTimeMillis()
         val duration = endTime - startTime
 
-        // Should handle 1000 frame updates reasonably quickly
         assertTrue("1000 updates should complete in reasonable time (< 5s)", duration < 5000)
 
-        // Final frame should be retrievable
         val finalFrame = previewBus.getCurrentFrame()
         assertNotNull("Final frame should be available after rapid updates", finalFrame)
     }
 
     @Test
     fun `memory management with frame replacement`() {
-        // Test that old frames don't cause memory leaks
         val initialMemory = Runtime.getRuntime().freeMemory()
 
         repeat(100) { i ->
-            val largeFrame = ByteArray(10240) { (i % 256).toByte() } // 10KB frames
+            val largeFrame = ByteArray(10240) { (i % 256).toByte() }
             previewBus.publishFrame(largeFrame)
 
             if (i % 10 == 0) {
-                System.gc() // Suggest garbage collection
+                System.gc()
             }
         }
 
-        // Verify final frame is still accessible
         val finalFrame = previewBus.getCurrentFrame()
         assertNotNull("Final frame should still be accessible", finalFrame)
         assertEquals("Final frame should have correct size", 10240, finalFrame!!.size)

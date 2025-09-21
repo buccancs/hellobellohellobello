@@ -19,7 +19,6 @@ class ShimmerManagerTest {
 
     @Before
     fun setUp() {
-        // Create manager without context for unit testing
         shimmerManager = ShimmerManager(null)
     }
 
@@ -30,7 +29,6 @@ class ShimmerManagerTest {
 
     @Test
     fun testInitialization() {
-        // Test that initialization sets up the manager correctly
         val result = shimmerManager.initialize()
 
         assertTrue("ShimmerManager should initialize successfully", result)
@@ -41,7 +39,6 @@ class ShimmerManagerTest {
     fun testDeviceInfoAfterInitialization() {
         shimmerManager.initialize()
 
-        // Test that device info is available (will be from current state flow value)
         val batteryLevel = shimmerManager.getBatteryLevel()
         assertEquals("Battery level should be set to 85", 85, batteryLevel)
     }
@@ -50,11 +47,9 @@ class ShimmerManagerTest {
     fun testConnectionFlow() {
         shimmerManager.initialize()
 
-        // Test scanning
         val scanResult = shimmerManager.startScanning()
         assertTrue("Scanning should start successfully", scanResult)
 
-        // Test connection
         val connectResult = shimmerManager.connect("SIM_001")
         assertTrue("Connection should succeed", connectResult)
         assertTrue("isConnected() should return true", shimmerManager.isConnected())
@@ -96,7 +91,6 @@ class ShimmerManagerTest {
 
     @Test
     fun testOperationsWithoutInitialization() {
-        // Test operations without initialization
         val scanResult = shimmerManager.startScanning()
         assertFalse("Scanning should fail without initialization", scanResult)
 

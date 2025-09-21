@@ -20,13 +20,11 @@ class FileTransferManagerTest {
             val sessionsRoot = Files.createTempDirectory("sessions_root").toFile()
             val sessionId = "session_abc"
             val sessionDir = java.io.File(sessionsRoot, sessionId).apply { mkdirs() }
-            // Create nested files
             val sub1 = java.io.File(sessionDir, "rgb").apply { mkdirs() }
             val sub2 = java.io.File(sessionDir, "gsr").apply { mkdirs() }
             java.io.File(sub1, "file1.txt").apply { writeText("hello") }
             java.io.File(sub2, "file2.txt").apply { writeText("world") }
 
-            // Start server
             val server = ServerSocket(0)
             val port = server.localPort
             val pool = Executors.newSingleThreadExecutor()
@@ -43,7 +41,6 @@ class FileTransferManagerTest {
                 }
             }
 
-            // Act: transfer (inject overrides to avoid Android/Robolectric dependencies)
             val ftm =
                 FileTransferManager(
                     context = null,
@@ -53,23 +50,18 @@ class FileTransferManagerTest {
                 )
             ftm.transferSession(sessionId, "127.0.0.1", port)
 
-            // Assert
             latch.await(5, TimeUnit.SECONDS)
             val header = headerHolder[0]
             require(header != null) { "Header was null" }
-            // Header is a single JSON line; avoid JSON lib dependency in pure JVM test
             assertThat(header.trim().startsWith("{")).isTrue()
             assertThat(header.contains("\"session_id\":\"$sessionId\"")).isTrue()
             assertThat(header.contains("\"device_id\":\"TestDevice\"")).isTrue()
             assertThat(header.contains("\"filename\":\"TestDevice_data.zip\"")).isTrue()
 
-            // Zip contained both files relative paths
-            // Depending on OS zip uses forward slashes
             assertThat(entries.any { it.endsWith("rgb/file1.txt") }).isTrue()
             assertThat(entries.any { it.endsWith("gsr/file2.txt") }).isTrue()
 
             pool.shutdownNow()
-            // Cleanup temp
             sessionsRoot.deleteRecursively()
         }
     }

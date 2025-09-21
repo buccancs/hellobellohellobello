@@ -49,32 +49,24 @@ def test_build_start_stop_flash_and_time_sync() -> None:
 
 
 def test_compute_time_sync_ntp_math() -> None:
-    # Example values: t0 (PC send), t1 (Android recv), t2 (Android send), t3 (PC recv)
     t0, t1, t2, t3 = 1000, 1500, 1600, 2000
     offset, delay = compute_time_sync(t0, t1, t2, t3)
-    # offset = ((1500-1000) + (1600-2000)) / 2 = (500 - 400)/2 = 50
-    # delay = (2000 - 1000) - (1600 - 1500) = 1000 - 100 = 900
     assert offset == 50 and delay == 900
 
 
 def test_parse_json_line_roundtrip() -> None:
     original = {"ack_id": 1, "status": "ok", "capabilities": {"has_thermal": False}}
-    text = str(original).replace("'", '"')  # naive JSON from dict
+    text = str(original).replace("'", '"')
     parsed = parse_json_line(text)
     assert parsed == original
 
 
 
 def test_compute_time_sync_stats_robustness() -> None:
-    # Offsets with a couple of strong outliers; delays with large outliers too
     offsets = [100, 102, 98, 5000, -4800, 101, 99, 100]
     delays = [1000, 900, 1100, 50000, 45000, 950, 980, 1005]
     median, min_delay, std_dev, used = compute_time_sync_stats(offsets, delays, trim_ratio=0.2)
-    # Median should be close to ~100 after trimming outliers
     assert abs(median - 100) <= 3
-    # Min delay should equal the minimum of provided delays
     assert min_delay == min(delays)
-    # trials used should be >= 3 after trimming
     assert used >= 3
-    # std_dev should be reasonable (non-negative integer)
     assert isinstance(std_dev, int) and std_dev >= 0

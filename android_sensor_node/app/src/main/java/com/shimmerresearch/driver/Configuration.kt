@@ -23,9 +23,9 @@ object Configuration {
          * Channel types for data formats
          */
         enum class ChannelType {
-            RAW, // Raw ADC values
-            CAL, // Calibrated values
-            UNCAL, // Uncalibrated values
+            RAW,
+            CAL,
+            UNCAL,
         }
 
         /**
@@ -45,10 +45,10 @@ object Configuration {
          */
         object GsrRange {
             const val AUTO = 0
-            const val RANGE_4_7M = 1 // 4.7MΩ - Most sensitive
-            const val RANGE_2_3M = 2 // 2.3MΩ
-            const val RANGE_1_2M = 3 // 1.2MΩ
-            const val RANGE_560K = 4 // 560kΩ - Least sensitive
+            const val RANGE_4_7M = 1
+            const val RANGE_2_3M = 2
+            const val RANGE_1_2M = 3
+            const val RANGE_560K = 4
         }
 
         /**

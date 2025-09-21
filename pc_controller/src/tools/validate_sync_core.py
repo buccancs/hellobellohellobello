@@ -57,17 +57,14 @@ def detect_flash_indices_from_brightness(
     x = np.asarray(brightness, dtype=np.float64)
     if x.size == 0:
         return []
-    # Normalize
     mu = float(np.mean(x))
     sigma = float(np.std(x)) or 1.0
     z = (x - mu) / sigma
-    # Candidate peaks: z-score or large positive derivative
     dz = np.diff(x, prepend=x[0])
     dz_sigma = float(np.std(dz)) or 1.0
     dz_z = dz / dz_sigma
     score = 0.6 * z + 0.4 * dz_z
-    # Greedy selection of top peaks with separation
-    idxs = list(np.argsort(-score))  # descending
+    idxs = list(np.argsort(-score))
     selected: list[int] = []
     used = np.zeros_like(x, dtype=bool)
     for idx in idxs:
@@ -75,13 +72,11 @@ def detect_flash_indices_from_brightness(
             break
         if used[idx]:
             continue
-        # local neighborhood suppression
         lo = max(0, idx - min_separation)
         hi = min(len(x), idx + min_separation + 1)
         selected.append(int(idx))
         used[lo:hi] = True
     selected.sort()
-    # Sanity filter: ensure peak prominence
     if selected:
         thresh = max(2.5, float(np.percentile(score, 90)))
         selected = [i for i in selected if score[i] >= thresh]
@@ -104,7 +99,6 @@ def estimate_T0_ns(
         return 0
     a = a[:n]
     r = r[:n]
-    # T0 = mean(a - r)
     return int(np.round(float(np.mean(a.astype(np.float64) - r.astype(np.float64)))))
 
 
@@ -132,7 +126,7 @@ class ValidationResult:
     per_event_ranges_ms: list[float]
     overall_max_ms: float
     passed: bool
-    details: dict[str, dict[str, int]]  # e.g., offset_sign per device, T0 per stream
+    details: dict[str, dict[str, int]]
 
 
 def compute_validation_report(
@@ -168,15 +162,17 @@ def compute_validation_report(
     for sname, det in detections_by_stream.items():
         T0_by_stream[sname] = estimate_T0_ns(ref_events, det.rel_times_ns)
 
-    # For each event index, compute absolute times across streams and range
     per_event_ranges_ms: list[float] = []
     for k in range(n_events):
         times_ns: list[int] = []
-        # include device aligned events (they represent the ground-truth schedule)
-        times_ns.extend(int(arr[k]) for arr in aligned_events_by_device.values() if k < len(arr))
-        # include each video stream's predicted time from T0 + rel
-        times_ns.extend(int(T0_by_stream[sname] + det.rel_times_ns[k])
-                       for sname, det in detections_by_stream.items() if k < len(det.rel_times_ns))
+        times_ns.extend(
+            int(arr[k]) for arr in aligned_events_by_device.values() if k < len(arr)
+        )
+        times_ns.extend(
+            int(T0_by_stream[sname] + det.rel_times_ns[k])
+            for sname, det in detections_by_stream.items()
+            if k < len(det.rel_times_ns)
+        )
         if times_ns:
             tmin = min(times_ns)
             tmax = max(times_ns)

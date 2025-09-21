@@ -45,6 +45,44 @@
             android:text="Frame Rate: N/A"
             android:textColor="#CCFFFFFF"
             android:textSize="12sp" />
+        
+        <!-- RAW DNG Controls for Samsung devices -->
+        <LinearLayout
+            android:id="@+id/rawDngControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <Switch
+                android:id="@+id/rawDngToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="RAW DNG"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:layout_marginEnd="16dp" />
+
+            <TextView
+                android:id="@+id/rawDngStatusText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Samsung Level 3"
+                android:textSize="10sp"
+                android:textColor="#4CAF50" />
+        </LinearLayout>
+
+        <!-- Device Model Info -->
+        <TextView
+            android:id="@+id/deviceModelText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Device: Unknown"
+            android:textSize="10sp"
+            android:textColor="#999999"
+            android:layout_marginTop="4dp" />
 
     </LinearLayout>
 

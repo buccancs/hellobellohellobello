@@ -15,7 +15,6 @@ from pc_controller.src.network.protocol import (
 def test_encode_decode_single_frame_roundtrip() -> None:
     msg: dict[str, object] = {"v": 1, "id": 123, "type": "cmd", "command": "query_capabilities"}
     framed = encode_frame(msg)
-    # prefix should be ascii length then newline
     nl = framed.find(b"\n")
     assert nl > 0 and framed[:nl].isdigit()
     length = int(framed[:nl])
@@ -29,10 +28,8 @@ def test_decode_multiple_frames_and_partial_buffer() -> None:
     a = {"v": 1, "id": 1, "type": "cmd", "command": "a"}
     b = {"v": 1, "id": 2, "type": "cmd", "command": "b"}
     stream = encode_frame(a) + encode_frame(b)
-    # feed partial
     res = decode_frames(stream[:10])
-    assert res.messages == []  # not enough to decode first
-    # feed full
+    assert res.messages == []
     res = decode_frames(stream)
     assert res.messages == [a, b]
     assert res.remainder == b""

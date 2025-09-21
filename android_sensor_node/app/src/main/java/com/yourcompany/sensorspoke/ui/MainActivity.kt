@@ -26,7 +26,7 @@ import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
-// R import handled automatically
+import com.yourcompany.sensorspoke.R
 import com.yourcompany.sensorspoke.controller.RecordingController
 import com.yourcompany.sensorspoke.network.ConnectionManager
 import com.yourcompany.sensorspoke.sensors.audio.AudioRecorder
@@ -58,10 +58,8 @@ class MainActivity : AppCompatActivity() {
     private var controller: RecordingController? = null
     private var connectionManager: ConnectionManager? = null
 
-    // Full integration: MultiModalSensorCoordinator for comprehensive sensor management
     private var multiModalCoordinator: MultiModalSensorCoordinator? = null
 
-    // UI Components
     private var viewPager: ViewPager2? = null
     private var tabLayout: TabLayout? = null
     private var btnStartRecording: Button? = null
@@ -70,7 +68,6 @@ class MainActivity : AppCompatActivity() {
     private var recordingTimeText: TextView? = null
     private var rootLayout: ViewGroup? = null
 
-    // Sensor status indicators
     private var rgbStatusIndicator: View? = null
     private var rgbStatusText: TextView? = null
     private var thermalStatusIndicator: View? = null
@@ -80,14 +77,17 @@ class MainActivity : AppCompatActivity() {
     private var pcStatusIndicator: View? = null
     private var pcStatusText: TextView? = null
 
-    // Enhanced navigation controller from IRCamera architecture
+    // Sensor status indicator components
+    private var rgbSensorStatus: SensorStatusIndicator? = null
+    private var thermalSensorStatus: SensorStatusIndicator? = null
+    private var gsrSensorStatus: SensorStatusIndicator? = null
+    private var pcSensorStatus: SensorStatusIndicator? = null
+
     private var navigationController: NavigationController? = null
 
-    // User experience enhancements
     private lateinit var preferences: SharedPreferences
     private var isFirstLaunch: Boolean = false
 
-    // Comprehensive permission management
     private lateinit var permissionManager: PermissionManager
 
     private val controlReceiver =
@@ -141,37 +141,27 @@ class MainActivity : AppCompatActivity() {
         preferences = getSharedPreferences("sensor_spoke_prefs", Context.MODE_PRIVATE)
         isFirstLaunch = preferences.getBoolean("first_launch", true)
 
-        // Initialize views
         initializeViews()
 
-        // Setup ViewPager with fragments
         setupViewPager()
 
-        // Setup button handlers
         setupButtons()
 
-        // Setup toolbar with menu
         setupToolbar()
 
-        // Initialize comprehensive permission management
         permissionManager = PermissionManager(this)
 
-        // Initialize connection manager
         connectionManager = createConnectionManager()
 
         // Initialize ViewModel with orchestrator and connection manager
         initializeViewModel()
 
-        // Setup UI state observers
         setupUiStateObservers()
 
-        // Initialize status
         vm.updateUiState { copy(statusText = "Initializing...") }
 
-        // Initialize TC001 thermal camera system
         initializeTC001System()
 
-        // Ensure background service for NSD + TCP server is running (skip during unit tests)
         if (!isRunningUnderTest()) {
             val svcIntent = Intent(this, RecordingService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -181,17 +171,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Show quick start guide for first-time users
         if (isFirstLaunch) {
             showQuickStartGuide()
         }
 
-        // Request all permissions on startup if not already granted
         if (!permissionManager.areAllPermissionsGranted()) {
             requestAllPermissions()
         }
 
-        // Initialize sensor status monitoring
         initializeSensorStatusMonitoring()
 
         vm.updateUiState { copy(statusText = "Ready to connect") }
@@ -209,7 +196,6 @@ class MainActivity : AppCompatActivity() {
         recordingTimeText = findViewById(R.id.recordingTimeText)
         rootLayout = findViewById<ViewGroup>(android.R.id.content)
 
-        // Initialize sensor status indicators
         rgbStatusIndicator = findViewById(R.id.rgbStatusIndicator)
         rgbStatusText = findViewById(R.id.rgbStatusText)
         thermalStatusIndicator = findViewById(R.id.thermalStatusIndicator)
@@ -228,7 +214,6 @@ class MainActivity : AppCompatActivity() {
             val networkClient = com.yourcompany.sensorspoke.network.NetworkClient(this)
             val manager = ConnectionManager(this, networkClient)
 
-            // Setup connection callbacks
             manager.onConnectionEstablished = { address, port ->
                 runOnUiThread {
                     vm.updatePcConnectionStatus(true, "$address:$port")
@@ -279,14 +264,12 @@ class MainActivity : AppCompatActivity() {
      * Setup UI state observers for reactive updates
      */
     private fun setupUiStateObservers() {
-        // Observe main UI state
         lifecycleScope.launch {
             vm.uiState.collect { uiState ->
                 updateUI(uiState)
             }
         }
 
-        // Observe error messages for dialogs
         lifecycleScope.launch {
             vm.showErrorDialog.collect { showDialog ->
                 if (showDialog) {
@@ -297,14 +280,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Observe sensor status for individual updates
         lifecycleScope.launch {
             vm.sensorStatus.collect { sensorMap ->
                 updateSensorStatusIndicators(sensorMap)
             }
         }
 
-        // Observe recording state for button updates
         lifecycleScope.launch {
             vm.recordingState.collect { state ->
                 updateButtonsForRecordingState(state)
@@ -316,11 +297,9 @@ class MainActivity : AppCompatActivity() {
      * Update UI based on comprehensive UI state
      */
     private fun updateUI(state: MainViewModel.MainUiState) {
-        // Update status text
         statusText?.text = state.statusText
         updateStatusTextColor(state.statusText)
 
-        // Update recording time visibility and text
         if (state.isRecording) {
             recordingTimeText?.visibility = View.VISIBLE
             recordingTimeText?.text = "Recording: ${state.recordingElapsedTime}"
@@ -328,20 +307,16 @@ class MainActivity : AppCompatActivity() {
             recordingTimeText?.visibility = View.GONE
         }
 
-        // Update button states
         btnStartRecording?.isEnabled = state.startButtonEnabled
         btnStopRecording?.isEnabled = state.stopButtonEnabled
 
-        // Update button text based on recording state
         btnStartRecording?.text = if (state.isRecording) "Recording..." else "Start Recording"
 
-        // Update sensor status indicators
         updateSensorIndicator(rgbStatusIndicator, rgbStatusText, state.isCameraConnected, "RGB")
         updateSensorIndicator(thermalStatusIndicator, thermalStatusText, state.isThermalConnected, "Thermal", state.thermalStatus.isSimulated)
         updateSensorIndicator(gsrStatusIndicator, gsrStatusText, state.isShimmerConnected, "GSR")
         updateSensorIndicator(pcStatusIndicator, pcStatusText, state.isPcConnected, "PC Link")
 
-        // Add thermal simulation indicator
         if (state.thermalStatus.isSimulated) {
             thermalStatusText?.text = "Thermal (Sim)"
         }
@@ -424,19 +399,16 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             while (true) {
                 try {
-                    // Monitor RGB camera status
                     monitorRgbCameraStatus()
 
-                    // Monitor thermal camera status
                     monitorThermalCameraStatus()
 
-                    // Monitor GSR sensor status
                     monitorGsrSensorStatus()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error monitoring sensor status", e)
                 }
 
-                kotlinx.coroutines.delay(3000) // Check every 3 seconds
+                kotlinx.coroutines.delay(3000)
             }
         }
     }
@@ -446,7 +418,6 @@ class MainActivity : AppCompatActivity() {
      */
     private suspend fun monitorRgbCameraStatus() {
         try {
-            // Check if camera is available (simplified check)
             val cameraManager = getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
             val cameraIds = cameraManager.cameraIdList
             val isAvailable = cameraIds.isNotEmpty()
@@ -462,8 +433,6 @@ class MainActivity : AppCompatActivity() {
      */
     private suspend fun monitorThermalCameraStatus() {
         try {
-            // Check if thermal camera is connected (this would be device-specific)
-            // For now, simulate the check
             val isHardwareConnected = checkThermalHardware()
             val isSimulated = !isHardwareConnected
 
@@ -478,8 +447,6 @@ class MainActivity : AppCompatActivity() {
      */
     private suspend fun monitorGsrSensorStatus() {
         try {
-            // Check Shimmer connection status
-            // This would integrate with the actual Shimmer sensor status
             val isConnected = checkShimmerConnection()
 
             vm.updateGsrStatus(isConnected, if (isConnected) "Shimmer3" else null)
@@ -492,7 +459,6 @@ class MainActivity : AppCompatActivity() {
      * Check thermal hardware availability
      */
     private fun checkThermalHardware(): Boolean {
-        // This would integrate with the actual TC001 SDK
         // For now, return false to simulate simulation mode
         return false
     }
@@ -501,8 +467,6 @@ class MainActivity : AppCompatActivity() {
      * Check Shimmer connection status
      */
     private fun checkShimmerConnection(): Boolean {
-        // This would integrate with the actual Shimmer API
-        // For now, return false to show disconnected state
         return false
     }
 
@@ -555,7 +519,6 @@ class MainActivity : AppCompatActivity() {
      * Initialize sensor status indicators with default states
      */
     private fun initializeSensorStatusIndicators() {
-        // Initialize with default sensor names for display
         rgbSensorStatus?.updateStatus(
             "RGB",
             SensorStatusIndicator.SensorStatus(
@@ -601,13 +564,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Initialize the ViewModel with the recording controller
+     * Update sensor status from current ViewModel state
      */
-    private fun initializeViewModel() {
-        lifecycleScope.launch {
-            val controller = ensureController()
-            vm.initialize(controller)
-        }
+    private fun updateSensorStatus() {
+        // This will be called to refresh sensor status indicators
+        // The actual updates happen via the uiState flow in observeUiState()
     }
 
     /**
@@ -616,37 +577,80 @@ class MainActivity : AppCompatActivity() {
     private fun observeUiState() {
         lifecycleScope.launch {
             vm.uiState.collect { state ->
-                // Update status text
                 statusText?.text = state.statusText
 
-                // Update recording timer
-                if (state.isRecording && state.recordingDurationSeconds > 0) {
-                    recordingTimer?.visibility = View.VISIBLE
-                    recordingTimer?.text = formatRecordingTime(state.recordingDurationSeconds)
+                if (state.isRecording && state.recordingElapsedTime != "00:00") {
+                    recordingTimeText?.visibility = View.VISIBLE
+                    recordingTimeText?.text = state.recordingElapsedTime
                 } else {
-                    recordingTimer?.visibility = View.GONE
+                    recordingTimeText?.visibility = View.GONE
                 }
 
-                // Update button states
                 btnStartRecording?.isEnabled = state.startButtonEnabled
                 btnStopRecording?.isEnabled = state.stopButtonEnabled
 
-                // Update button text based on recording state
                 btnStartRecording?.text = if (state.isRecording) "Recording..." else "Start Recording"
 
-                // Update sensor status indicators
-                rgbSensorStatus?.updateStatus("RGB Camera", state.cameraStatus.toSensorStatusIndicator())
-                thermalSensorStatus?.updateStatus("Thermal", state.thermalStatus.toSensorStatusIndicator())
-                gsrSensorStatus?.updateStatus("GSR", state.shimmerStatus.toSensorStatusIndicator())
-                pcSensorStatus?.updateStatus("PC Link", state.pcStatus.toSensorStatusIndicator())
+                rgbSensorStatus?.updateStatus("RGB Camera", 
+                    state.sensorStatus["rgb"]?.let { sensorStatus ->
+                        SensorStatusIndicator.SensorStatus(
+                            name = "RGB Camera",
+                            isActive = sensorStatus.isActive,
+                            isHealthy = sensorStatus.isHealthy,
+                            statusMessage = sensorStatus.statusMessage
+                        )
+                    } ?: SensorStatusIndicator.SensorStatus(
+                        name = "RGB Camera",
+                        isActive = state.isCameraConnected,
+                        isHealthy = state.isCameraConnected,
+                        statusMessage = if (state.isCameraConnected) "Connected" else "Disconnected"
+                    )
+                )
+                
+                thermalSensorStatus?.updateStatus("Thermal", 
+                    state.sensorStatus["thermal"]?.let { sensorStatus ->
+                        SensorStatusIndicator.SensorStatus(
+                            name = "Thermal Camera",
+                            isActive = sensorStatus.isActive,
+                            isHealthy = sensorStatus.isHealthy,
+                            statusMessage = sensorStatus.statusMessage
+                        )
+                    } ?: SensorStatusIndicator.SensorStatus(
+                        name = "Thermal Camera",
+                        isActive = state.isThermalConnected,
+                        isHealthy = state.isThermalConnected,
+                        statusMessage = if (state.isThermalConnected) "Connected" else "Disconnected"
+                    )
+                )
+                
+                gsrSensorStatus?.updateStatus("GSR", 
+                    state.sensorStatus["gsr"]?.let { sensorStatus ->
+                        SensorStatusIndicator.SensorStatus(
+                            name = "GSR Sensor",
+                            isActive = sensorStatus.isActive,
+                            isHealthy = sensorStatus.isHealthy,
+                            statusMessage = sensorStatus.statusMessage
+                        )
+                    } ?: SensorStatusIndicator.SensorStatus(
+                        name = "GSR Sensor",
+                        isActive = state.isShimmerConnected,
+                        isHealthy = state.isShimmerConnected,
+                        statusMessage = if (state.isShimmerConnected) "Connected" else "Disconnected"
+                    )
+                )
+                
+                pcSensorStatus?.updateStatus("PC Link", SensorStatusIndicator.SensorStatus(
+                    name = "PC Link",
+                    isActive = state.isPcConnected,
+                    isHealthy = state.isPcConnected,
+                    statusMessage = if (state.isPcConnected) "Connected" else "Disconnected"
+                ))
 
-                // Handle error dialog
                 if (state.showErrorDialog && !state.errorMessage.isNullOrEmpty()) {
                     showErrorDialog(state.errorMessage)
                 }
 
-                // Handle thermal simulation feedback
-                if (state.thermalIsSimulated && state.isThermalConnected) {
+                if (state.thermalStatus.isSimulated && state.isThermalConnected) {
                     showThermalSimulationOverlay()
                 }
             }
@@ -728,19 +732,16 @@ class MainActivity : AppCompatActivity() {
         val adapter = MainPagerAdapter(this)
         viewPager?.adapter = adapter
 
-        // Initialize enhanced navigation controller
         viewPager?.let { vp ->
             navigationController = NavigationController(this, vp)
         }
 
-        // Connect TabLayout with ViewPager2
         tabLayout?.let { tabLayout ->
             viewPager?.let { viewPager ->
                 TabLayoutMediator(tabLayout, viewPager) { tab, position ->
                     tab.text = MainPagerAdapter.TAB_TITLES[position]
                 }.attach()
 
-                // Register page change callback for enhanced navigation tracking
                 viewPager.registerOnPageChangeCallback(
                     object : ViewPager2.OnPageChangeCallback() {
                         override fun onPageSelected(position: Int) {
@@ -755,7 +756,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         btnStartRecording?.setOnClickListener {
-            // Enhanced UI feedback during permission checks
             vm.updateUiState { copy(statusText = "Checking permissions...") }
             btnStartRecording?.isEnabled = false
 
@@ -768,7 +768,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnStopRecording?.setOnClickListener {
-            // Enhanced UI feedback during stop operation
             vm.updateUiState { copy(statusText = "Stopping recording...") }
             btnStopRecording?.isEnabled = false
 
@@ -861,13 +860,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Cleanup MultiModalSensorCoordinator for full integration
         lifecycleScope.launch {
             multiModalCoordinator?.stopRecording()
             multiModalCoordinator = null
         }
 
-        // Cleanup permission manager
         permissionManager.cleanup()
     }
 
@@ -875,11 +872,10 @@ class MainActivity : AppCompatActivity() {
         val existing = controller
         if (existing != null) return existing
         val c = RecordingController(applicationContext)
-        // Register recorders
         c.register("rgb", RgbCameraRecorder(applicationContext, this))
         c.register("thermal", ThermalCameraRecorder(applicationContext))
         c.register("gsr", ShimmerRecorder(applicationContext))
-        c.register("audio", AudioRecorder(applicationContext)) // FR5: Audio recording support
+        c.register("audio", AudioRecorder(applicationContext))
         controller = c
         return c
     }
@@ -893,7 +889,6 @@ class MainActivity : AppCompatActivity() {
 
         val coordinator = MultiModalSensorCoordinator(applicationContext, this)
 
-        // Initialize the complete multi-modal system
         val initResult = coordinator.initializeSystem()
         if (initResult) {
             Log.i("MainActivity", "MultiModalSensorCoordinator initialized successfully - Full Integration active")
@@ -907,7 +902,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun showQuickStartGuide() {
         QuickStartDialog.show(this) {
-            // Mark first launch as complete
             preferences
                 .edit()
                 .putBoolean("first_launch", false)
@@ -926,7 +920,6 @@ class MainActivity : AppCompatActivity() {
                         "${index + 1}. $step"
                     }.joinToString("\n")
 
-        // Show as a Snackbar with action
         rootLayout?.let { layout ->
             val snackbar =
                 Snackbar
@@ -959,7 +952,6 @@ class MainActivity : AppCompatActivity() {
             }
         parent.addView(flash)
 
-        // Log flash display timing for synchronization validation
         Log.d("FlashSync", "Flash overlay displayed at: ${flashStartTime}ns")
 
         flash.postDelayed({
@@ -978,7 +970,7 @@ class MainActivity : AppCompatActivity() {
                 f.writeText("trigger_timestamp_ns,actual_flash_timestamp_ns,sync_delay_ms,device_id\n")
             }
 
-            val syncDelay = (actualFlashTime - tsNs) / 1_000_000.0 // Convert to milliseconds
+            val syncDelay = (actualFlashTime - tsNs) / 1_000_000.0
             val deviceId =
                 android.os.Build.MODEL
                     ?.replace(" ", "_") ?: "unknown"
@@ -996,7 +988,6 @@ class MainActivity : AppCompatActivity() {
      * Navigate to thermal camera preview - Enhanced integration method
      */
     fun navigateToThermalPreview() {
-        // Use NavigationController to navigate to thermal camera
         navigationController?.navigateToThermalCamera(ThermalNavigationState.PREVIEW)
     }
 
@@ -1012,16 +1003,13 @@ class MainActivity : AppCompatActivity() {
      */
     private fun initializeTC001System() {
         try {
-            // Initialize TC001 logging
-            com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001InitUtil
+            com.yourcompany.sensorspoke.sensors.thermal.TC001InitUtil
                 .initLog()
 
-            // Initialize TC001 USB receivers
-            com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001InitUtil
+            com.yourcompany.sensorspoke.sensors.thermal.TC001InitUtil
                 .initReceiver(this)
 
-            // Initialize TC001 device manager
-            com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001InitUtil
+            com.yourcompany.sensorspoke.sensors.thermal.TC001InitUtil
                 .initTC001DeviceManager(this)
 
             Log.i("MainActivity", "TC001 thermal camera system initialized successfully")
@@ -1050,10 +1038,6 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "Permission status: ${permissionManager.getPermissionStatus()}")
             }
         }
-    }
-
-    fun showToast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     private fun showUserFriendlyError(message: String, context: String = "") {

@@ -58,7 +58,6 @@ class RgbDataProcessor {
         val fileSize = if (imageFile.exists()) imageFile.length() else 0
         val filename = imageFile.name
 
-        // Enhanced video correlation metrics with improved accuracy
         val baseTime = if (actualVideoStartTime > 0) actualVideoStartTime else videoStartTime
         val videoRelativeTimeMs = if (baseTime > 0) {
             ((timestampNs - baseTime) / 1_000_000).toInt()
@@ -66,22 +65,18 @@ class RgbDataProcessor {
             0
         }
 
-        // More accurate video frame estimation using actual video timing
         val estimatedVideoFrame = if (videoRelativeTimeMs > 0) {
-            // Assume 30 FPS but account for potential frame rate variations
             (videoRelativeTimeMs * 30.0 / 1000.0).toInt()
         } else {
             0
         }
 
-        // Calculate synchronization quality metric
         val syncQuality = calculateSyncQuality(timestampNs, baseTime)
 
-        // Calculate offset from actual video start
         val actualVideoOffsetMs = if (actualVideoStartTime > 0) {
             ((timestampNs - actualVideoStartTime) / 1_000_000).toInt()
         } else {
-            -1 // Indicates video hasn't actually started yet
+            -1
         }
 
         return FrameData(
@@ -111,26 +106,21 @@ class RgbDataProcessor {
         return try {
             if (!imageFile.exists()) return false
 
-            // Load and downsample the image for preview
             val options = BitmapFactory.Options().apply {
-                inSampleSize = 4 // 1/4 size for preview
+                inSampleSize = 4
                 inPreferredConfig = Bitmap.Config.RGB_565
             }
 
             val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath, options)
             if (bitmap != null) {
-                // Scale to standard preview size
                 val previewBitmap = Bitmap.createScaledBitmap(bitmap, 320, 240, true)
 
-                // Compress to JPEG for preview bus
                 val baos = ByteArrayOutputStream()
                 previewBitmap.compress(Bitmap.CompressFormat.JPEG, 60, baos)
                 val previewBytes = baos.toByteArray()
 
-                // Emit preview
                 PreviewBus.emit(previewBytes, timestamp)
 
-                // Cleanup
                 baos.close()
                 if (previewBitmap != bitmap) {
                     bitmap.recycle()
@@ -155,15 +145,12 @@ class RgbDataProcessor {
         return if (videoBaseTime <= 0) {
             0.0 // No video timing reference yet
         } else {
-            // Calculate timing consistency - how well frame timing aligns with expected intervals
             val relativeTime = frameTimestamp - videoBaseTime
-            val expectedFrameInterval = 33_333_333L // ~30 FPS in nanoseconds
+            val expectedFrameInterval = 33_333_333L
 
-            // Calculate how close we are to expected frame timing
             val timingDeviation = relativeTime % expectedFrameInterval
             val deviationRatio = timingDeviation.toDouble() / expectedFrameInterval.toDouble()
 
-            // Convert to quality score (closer to 0 deviation = higher quality)
             1.0 - kotlin.math.min(deviationRatio, 0.5) * 2.0
         }
     }
@@ -203,7 +190,7 @@ class RgbDataProcessor {
             "frameTimestampOffset" to frameTimestampOffset,
             "totalFramesCaptured" to frameCount,
             "avgFrameInterval" to if (frameCount > 1) {
-                (System.nanoTime() - videoStartTime) / frameCount / 1_000_000 // ms
+                (System.nanoTime() - videoStartTime) / frameCount / 1_000_000
             } else {
                 0
             },

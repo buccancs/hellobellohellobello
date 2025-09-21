@@ -32,10 +32,8 @@ class TestAuthManager:
         auth = AuthManager(secret_key="test_secret")
         device_id = "device_001"
 
-        # Create challenge
         challenge_data = auth.create_challenge(device_id)
 
-        # Simulate device response
         import hashlib
         import hmac
 
@@ -56,7 +54,6 @@ class TestAuthManager:
             "timestamp": str(timestamp)
         }
 
-        # Verify authentication
         assert auth.verify_response(device_id, response) is True
         assert device_id in auth.get_active_devices()
         assert auth.is_authorized(device_id, "record") is True
@@ -82,7 +79,6 @@ class TestAuthManager:
         auth = AuthManager(secret_key="test_secret")
         device_id = "device_001"
 
-        # First successful auth
         challenge_data = auth.create_challenge(device_id)
 
         import hashlib
@@ -107,14 +103,12 @@ class TestAuthManager:
 
         assert auth.verify_response(device_id, response) is True
 
-        # Try to replay same response - should fail
         device_id_2 = "device_002"
         auth.create_challenge(device_id_2)
         assert auth.verify_response(device_id_2, response) is False
 
     def test_token_expiration(self):
         """Test token expiration functionality."""
-        # Use short token lifetime for testing
         with patch('pc_controller.src.network.auth_manager.cfg_get') as mock_cfg:
             mock_cfg.side_effect = (
                 lambda key, default: 1 if key == "auth_token_lifetime_seconds" else default
@@ -123,7 +117,6 @@ class TestAuthManager:
             auth = AuthManager(secret_key="test_secret")
             device_id = "device_001"
 
-            # Authenticate device
             challenge_data = auth.create_challenge(device_id)
 
             import hashlib
@@ -149,7 +142,6 @@ class TestAuthManager:
             assert auth.verify_response(device_id, response) is True
             assert auth.is_authorized(device_id, "record") is True
 
-            # Wait for token to expire
             time.sleep(2)
             assert auth.is_authorized(device_id, "record") is False
             assert device_id not in auth.get_active_devices()
@@ -159,7 +151,6 @@ class TestAuthManager:
         auth = AuthManager(secret_key="test_secret")
         device_id = "device_001"
 
-        # Authenticate device
         challenge_data = auth.create_challenge(device_id)
 
         import hashlib
@@ -184,13 +175,11 @@ class TestAuthManager:
 
         assert auth.verify_response(device_id, response) is True
 
-        # Check valid permissions
         assert auth.is_authorized(device_id, "record") is True
         assert auth.is_authorized(device_id, "sync") is True
         assert auth.is_authorized(device_id, "preview") is True
         assert auth.is_authorized(device_id, "transfer") is True
 
-        # Check invalid permission
         assert auth.is_authorized(device_id, "admin") is False
 
     def test_token_revocation(self):
@@ -198,7 +187,6 @@ class TestAuthManager:
         auth = AuthManager(secret_key="test_secret")
         device_id = "device_001"
 
-        # Authenticate device
         challenge_data = auth.create_challenge(device_id)
 
         import hashlib
@@ -224,10 +212,8 @@ class TestAuthManager:
         assert auth.verify_response(device_id, response) is True
         assert auth.is_authorized(device_id, "record") is True
 
-        # Revoke token
         assert auth.revoke_token(device_id) is True
         assert auth.is_authorized(device_id, "record") is False
         assert device_id not in auth.get_active_devices()
 
-        # Try to revoke non-existent token
         assert auth.revoke_token("nonexistent") is False

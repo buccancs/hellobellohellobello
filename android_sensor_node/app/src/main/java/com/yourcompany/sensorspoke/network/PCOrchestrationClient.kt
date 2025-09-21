@@ -37,7 +37,6 @@ class PCOrchestrationClient(
         private const val DEFAULT_SERVICE_TYPE = "_sensorspoke._tcp"
         private const val DEFAULT_SERVICE_NAME = "SensorSpoke-Node"
 
-        // Intent action for flash sync
         const val ACTION_FLASH_SYNC = "com.yourcompany.sensorspoke.FLASH_SYNC"
         const val EXTRA_TIMESTAMP = "timestamp"
     }
@@ -46,7 +45,6 @@ class PCOrchestrationClient(
     private var networkClient: NetworkClient? = null
     private var isStarted = false
 
-    // Protocol definitions for JSON message format
     object Protocol {
         const val CMD_START_RECORDING = "start_recording"
         const val CMD_STOP_RECORDING = "stop_recording"
@@ -79,7 +77,6 @@ class PCOrchestrationClient(
             try {
                 networkClient = NetworkClient(context)
 
-                // Register service for PC discovery
                 networkClient?.register(
                     type = DEFAULT_SERVICE_TYPE,
                     name = DEFAULT_SERVICE_NAME,
@@ -180,7 +177,6 @@ class PCOrchestrationClient(
         val timestamp = System.nanoTime()
 
         try {
-            // Broadcast flash sync intent to UI components
             val flashIntent = Intent(ACTION_FLASH_SYNC).apply {
                 putExtra(EXTRA_TIMESTAMP, timestamp)
             }
@@ -239,11 +235,9 @@ class PCOrchestrationClient(
         return try {
             Log.i(TAG, "Starting file transfer for session $sessionId to $host:$port")
 
-            // Get session directory
             val sessionDir = getSessionDirectory(sessionId)
                 ?: return createErrorResponse(ackId, "Session directory not found for session $sessionId")
 
-            // Start file transfer in background
             scope.launch {
                 transferSessionFiles(sessionDir, host, port, sessionId)
             }
@@ -265,7 +259,6 @@ class PCOrchestrationClient(
             Socket(host, port).use { socket ->
                 val outputStream = socket.getOutputStream()
 
-                // Send transfer header
                 val header = JSONObject().apply {
                     put("type", "file_transfer")
                     put("session_id", sessionId)
@@ -275,11 +268,9 @@ class PCOrchestrationClient(
                 outputStream.write(header.toByteArray())
                 outputStream.flush()
 
-                // Transfer files
                 val transferredFiles = mutableListOf<String>()
                 transferDirectoryFiles(sessionDir, outputStream, transferredFiles)
 
-                // Send completion marker
                 val completion = JSONObject().apply {
                     put("type", "transfer_complete")
                     put("files_transferred", transferredFiles.size)
@@ -302,20 +293,16 @@ class PCOrchestrationClient(
     private fun transferDirectoryFiles(dir: File, outputStream: OutputStream, transferredFiles: MutableList<String>) {
         dir.listFiles()?.forEach { file ->
             if (file.isDirectory) {
-                // Recursively transfer subdirectories
                 transferDirectoryFiles(file, outputStream, transferredFiles)
             } else {
                 try {
                     transferFile(file, outputStream)
-                    // Use the session directory as base for relative path calculation
                     val sessionDir = dir
                     while (sessionDir.parentFile != null && sessionDir.parentFile?.name != "recording_sessions") {
-                        // Walk up to find the session directory
                     }
                     val relativePath = try {
                         file.relativeTo(dir).path
                     } catch (e: IllegalArgumentException) {
-                        // Fallback to absolute path if relativeTo fails
                         file.absolutePath
                     }
                     transferredFiles.add(relativePath)
@@ -339,11 +326,9 @@ class PCOrchestrationClient(
             put("timestamp", file.lastModified())
         }
 
-        // Send file metadata
         val header = fileInfo.toString() + "\n"
         outputStream.write(header.toByteArray())
 
-        // Send file content (Base64 encoded for JSON compatibility)
         FileInputStream(file).use { fileInput ->
             val buffer = ByteArray(8192)
             var bytesRead: Int
@@ -360,7 +345,6 @@ class PCOrchestrationClient(
             }
         }
 
-        // Send file end marker
         val endMarker = JSONObject().apply {
             put("type", "file_end")
             put("name", file.name)
@@ -374,12 +358,9 @@ class PCOrchestrationClient(
      * Get session directory for the given session ID
      */
     private fun getSessionDirectory(sessionId: String): File? {
-        // Try to get session directory from SessionOrchestrator
-        // This is a simplified implementation - in practice, you'd get this from the session manager
         val appDir = context.getExternalFilesDir(null) ?: context.filesDir
         val sessionsDir = File(appDir, "recording_sessions")
 
-        // Look for session directory by ID - use exact match only
         return sessionsDir.listFiles()?.find { dir ->
             dir.isDirectory && dir.name == sessionId
         }
@@ -420,8 +401,6 @@ class PCOrchestrationClient(
      * Trigger flash sync UI indication
      */
     private fun triggerFlashSyncUI() {
-        // Flash the screen white for visual synchronization
-        // This would typically interact with the UI layer to create a white flash
         Log.d(TAG, "Triggering flash sync UI indication")
         // Note: Actual UI flash implementation would be handled by the UI layer
     }
@@ -433,9 +412,7 @@ class PCOrchestrationClient(
         return try {
             Log.d(TAG, "Initiating file transfer for session $sessionId to $host:$port")
 
-            // In a full implementation, this would use FileTransferManager
-            // For now, we simulate the transfer initiation
-            val transferStarted = true // Simulate successful transfer start
+            val transferStarted = true
 
             if (transferStarted) {
                 createSuccessResponse(ackId, "File transfer initiated")

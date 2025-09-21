@@ -11,19 +11,15 @@ class PreviewBusTest {
         val listener: (ByteArray, Long) -> Unit = { bytes, ts ->
             received.add(Pair(bytes.size, ts))
         }
-        // Subscribe
         PreviewBus.subscribe(listener)
-        // Emit one frame
         val payload1 = ByteArray(10) { 1 }
         val t1 = TimeManager.nowNanos()
         PreviewBus.emit(payload1, t1)
-        // Verify received
         assertThat(received.size).isAtLeast(1)
         val (len1, ts1) = received[0]
         assertThat(len1).isEqualTo(10)
         assertThat(ts1).isEqualTo(t1)
 
-        // Unsubscribe and emit again; count should not grow
         PreviewBus.unsubscribe(listener)
         val before = received.size
         val payload2 = ByteArray(7) { 2 }

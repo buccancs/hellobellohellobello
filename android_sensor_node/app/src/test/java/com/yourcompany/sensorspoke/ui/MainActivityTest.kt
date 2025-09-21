@@ -18,7 +18,6 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        // Root content view is a FrameLayout with id android.R.id.content
         val content = activity.findViewById<ViewGroup>(android.R.id.content)
         assertThat(content.childCount).isAtLeast(1)
         val root = content.getChildAt(0)

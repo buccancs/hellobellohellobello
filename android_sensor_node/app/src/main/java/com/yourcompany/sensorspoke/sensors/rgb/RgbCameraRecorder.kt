@@ -49,15 +49,23 @@ class RgbCameraRecorder(
     companion object {
         private const val TAG = "RgbCameraRecorder"
     }
+    
+    /**
+     * Recording modes for the camera system
+     */
+    enum class RecordingMode {
+        STANDARD,   // CameraX video + JPEG frames
+        RAW_DNG     // CameraX + Camera2 RAW DNG parallel capture
+    }
 
-    // Mutable camera selector for switching between front/back
     private var cameraSelector: CameraSelector = initialCameraSelector
 
-    // Manager classes for separation of concerns
     private val rgbCameraManager = cameraManager ?: RgbCameraManager(context, lifecycleOwner, cameraSelector)
     private val dataProcessor = RgbDataProcessor()
+    
+    // RAW DNG recording state
+    private var recordingMode = RecordingMode.STANDARD
 
-    // Recording state
     private var recording: Recording? = null
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -70,14 +78,12 @@ class RgbCameraRecorder(
     private var actualVideoStartTime: Long = 0L
     private var frameTimestampOffset: Long = 0L
 
-    // Status reporting for UI reactivity
     private val _recordingStatus = MutableStateFlow(RecordingStatus.IDLE)
     val recordingStatus: StateFlow<RecordingStatus> = _recordingStatus.asStateFlow()
 
     private val _frameRate = MutableStateFlow(0.0)
     val frameRate: StateFlow<Double> = _frameRate.asStateFlow()
 
-    // Enhanced camera status for UI feedback
     private val _cameraStatus = MutableStateFlow<RgbCameraManager.CameraStatus?>(null)
     val cameraStatus: StateFlow<RgbCameraManager.CameraStatus?> = _cameraStatus.asStateFlow()
 
@@ -97,21 +103,17 @@ class RgbCameraRecorder(
         _recordingStatus.value = RecordingStatus.STARTING
 
         try {
-            // Initialize enhanced camera manager if not already done
             if (!rgbCameraManager.isReady()) {
                 if (!rgbCameraManager.initialize()) {
                     throw RuntimeException("Failed to initialize enhanced RGB camera manager")
                 }
             }
 
-            // Update camera status for UI feedback
             _cameraStatus.value = rgbCameraManager.getCameraStatus()
             
-            // Log camera capabilities for Samsung S22
             val status = _cameraStatus.value
             Log.i(TAG, "Camera initialized - Model: ${status?.deviceModel}, Quality: ${status?.quality}, 4K Support: ${status?.supports4K}")
             
-            // Update device connection manager with enhanced info
             deviceConnectionManager?.updateRgbCameraState(
                 DeviceConnectionManager.DeviceState.CONNECTING,
                 DeviceConnectionManager.DeviceDetails(
@@ -122,30 +124,51 @@ class RgbCameraRecorder(
                 ),
             )
 
-            // Ensure directories
             val framesDir = File(sessionDir, "frames").apply { mkdirs() }
+            
+            // Create RAW DNG directory if in RAW mode
+            val rawDngDir = if (recordingMode == RecordingMode.RAW_DNG) {
+                File(sessionDir, "raw_dng").apply { mkdirs() }
+            } else null
 
-            // Open CSV for frame metadata using data processor
             csvFile = File(sessionDir, "rgb_frames.csv")
             csvWriter = BufferedWriter(FileWriter(csvFile!!, true))
             if (csvFile!!.length() == 0L) {
-                csvWriter!!.write(dataProcessor.getCsvHeader() + "\n")
+                val header = if (recordingMode == RecordingMode.RAW_DNG) {
+                    dataProcessor.getCsvHeader() + ",raw_dng_file"
+                } else {
+                    dataProcessor.getCsvHeader()
+                }
+                csvWriter!!.write(header + "\n")
                 csvWriter!!.flush()
             }
 
-            // Start enhanced video recording with detected quality
             startVideoRecording(File(sessionDir, "video.mp4"))
+            
+            // Initialize RAW DNG capture session if in RAW mode
+            if (recordingMode == RecordingMode.RAW_DNG && rawDngDir != null) {
+                val rawDngManager = rgbCameraManager.getCamera2RawDngManager()
+                if (rawDngManager != null) {
+                    val sessionStarted = rawDngManager.startRawCaptureSession()
+                    if (sessionStarted) {
+                        Log.i(TAG, "RAW DNG capture session started successfully")
+                        _recordingStatus.value = RecordingStatus.RECORDING
+                    } else {
+                        Log.w(TAG, "Failed to start RAW DNG capture session, continuing with standard recording")
+                    }
+                } else {
+                    Log.w(TAG, "RAW DNG manager not available, continuing with standard recording")
+                }
+            }
 
             // Start frame capture process
-            startFrameCapture(framesDir)
+            startFrameCapture(framesDir, rawDngDir)
 
-            // Start synchronization monitoring
             startSyncMonitoring()
 
             _recordingStatus.value = RecordingStatus.RECORDING
             rgbCameraManager.updateRecordingState(true)
 
-            // Update device connection state to connected
             deviceConnectionManager?.updateRgbCameraState(
                 DeviceConnectionManager.DeviceState.CONNECTED,
                 DeviceConnectionManager.DeviceDetails(
@@ -180,20 +203,24 @@ class RgbCameraRecorder(
         _recordingStatus.value = RecordingStatus.STOPPING
 
         try {
-            // Stop recording
             recording?.stop()
             recording = null
 
-            // Cancel capture job and wait for completion
             captureJob?.let {
                 it.cancel()
-                it.join() // Wait for completion to avoid race condition
+                it.join()
             }
             captureJob = null
 
-            // Cancel sync monitoring job
             syncMonitorJob?.cancel()
             syncMonitorJob = null
+
+            // Stop RAW DNG capture session if active
+            if (recordingMode == RecordingMode.RAW_DNG) {
+                val rawDngManager = rgbCameraManager.getCamera2RawDngManager()
+                rawDngManager?.stopRawCaptureSession()
+                Log.i(TAG, "RAW DNG capture session stopped")
+            }
 
             // Close CSV resources
             csvWriter?.flush()
@@ -201,16 +228,12 @@ class RgbCameraRecorder(
             csvWriter = null
             csvFile = null
 
-            // Update camera manager state
             rgbCameraManager.updateRecordingState(false)
 
-            // Update device connection state
             deviceConnectionManager?.updateRgbCameraState(DeviceConnectionManager.DeviceState.DISCONNECTED)
 
-            // Shutdown executor
             executor.shutdown()
 
-            // Cancel scope
             scope.cancel()
 
             _recordingStatus.value = RecordingStatus.IDLE
@@ -236,7 +259,6 @@ class RgbCameraRecorder(
         recording = videoCapture.output
             .prepareRecording(context, outputOpts)
             .start(ContextCompat.getMainExecutor(context)) { event ->
-                // Handle recording events for better synchronization logging
                 Log.d(TAG, "Recording event: $event")
                 when (event) {
                     is androidx.camera.video.VideoRecordEvent.Start -> {
@@ -245,7 +267,6 @@ class RgbCameraRecorder(
                         Log.i(TAG, "Video recording actually started at: $actualVideoStartTime")
                         Log.i(TAG, "Video start offset: ${frameTimestampOffset / 1_000_000}ms")
 
-                        // Log the actual video start for post-processing synchronization
                         dataProcessor.logVideoEvent(
                             csvFile, "VIDEO_RECORDING_STARTED", actualVideoStartTime,
                             "offset_ms:${frameTimestampOffset / 1_000_000}",
@@ -260,7 +281,6 @@ class RgbCameraRecorder(
                         )
                     }
                     is androidx.camera.video.VideoRecordEvent.Status -> {
-                        // Log periodic status for timing verification
                         if (event.recordingStats.numBytesRecorded > 0) {
                             val statusTime = System.nanoTime()
                             dataProcessor.logVideoEvent(
@@ -275,17 +295,17 @@ class RgbCameraRecorder(
         Log.i(TAG, "Video recording started: ${videoFileWithTimestamp.absolutePath} at timestamp $sessionStartTs")
     }
 
-    private fun startFrameCapture(framesDir: File) {
+    private fun startFrameCapture(framesDir: File, rawDngDir: File?) {
         captureJob = scope.launch {
-            Log.i(TAG, "Starting frame capture loop")
+            Log.i(TAG, "Starting frame capture loop with mode: $recordingMode")
 
             while (isActive) {
                 try {
-                    captureFrame(framesDir)
+                    captureFrame(framesDir, rawDngDir)
                     delay(33) // ~30 FPS for high-quality data capture
                 } catch (e: Exception) {
                     Log.e(TAG, "Error capturing frame: ${e.message}", e)
-                    delay(1000) // Wait longer on error
+                    delay(1000)
                 }
             }
         }
@@ -297,18 +317,17 @@ class RgbCameraRecorder(
 
             while (isActive) {
                 try {
-                    delay(5000) // Monitor every 5 seconds
+                    delay(5000)
 
                     if (actualVideoStartTime > 0 && frameCount > 0) {
                         val currentTime = System.nanoTime()
-                        val totalRecordingTime = (currentTime - actualVideoStartTime) / 1_000_000 // ms
+                        val totalRecordingTime = (currentTime - actualVideoStartTime) / 1_000_000
                         val avgFrameRate = if (totalRecordingTime > 0) {
                             (frameCount * 1000.0) / totalRecordingTime
                         } else {
                             0.0
                         }
 
-                        // Update frame rate for UI
                         _frameRate.value = avgFrameRate
 
                         dataProcessor.logVideoEvent(
@@ -320,13 +339,13 @@ class RgbCameraRecorder(
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in sync monitoring: ${e.message}", e)
-                    delay(1000) // Wait longer on error
+                    delay(1000)
                 }
             }
         }
     }
 
-    private suspend fun captureFrame(framesDir: File) {
+    private suspend fun captureFrame(framesDir: File, rawDngDir: File?) {
         val timestampNs = TimeManager.nowNanos()
         val timestampMs = System.currentTimeMillis()
         frameCount++
@@ -348,6 +367,13 @@ class RgbCameraRecorder(
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     try {
+                        var rawDngFilename: String? = null
+                        
+                        // Capture RAW DNG if in RAW mode and directory exists
+                        if (recordingMode == RecordingMode.RAW_DNG && rawDngDir != null) {
+                            rawDngFilename = captureRawDngFrame(timestampNs, rawDngDir)
+                        }
+
                         // Create frame data using data processor
                         val frameData = dataProcessor.createFrameData(
                             timestampNs,
@@ -358,22 +384,62 @@ class RgbCameraRecorder(
                             actualVideoStartTime,
                         )
 
-                        // Write to CSV using data processor
+                        // Write to CSV using data processor with optional RAW DNG filename
                         csvWriter?.apply {
-                            write(dataProcessor.formatFrameDataForCsv(frameData) + "\n")
+                            val csvLine = if (rawDngFilename != null) {
+                                dataProcessor.formatFrameDataForCsv(frameData) + ",$rawDngFilename"
+                            } else {
+                                dataProcessor.formatFrameDataForCsv(frameData)
+                            }
+                            write(csvLine + "\n")
                             flush()
                         }
 
-                        // Generate preview for UI
                         dataProcessor.generatePreview(outputFile, timestampNs)
 
-                        Log.d(TAG, "Captured frame: ${frameData.filename} (${frameData.fileSizeBytes} bytes) - Video time: ${frameData.videoRelativeTimeMs}ms, Est. frame: ${frameData.estimatedVideoFrame}, Sync quality: ${"%.3f".format(frameData.syncQuality)}")
+                        val modeInfo = if (recordingMode == RecordingMode.RAW_DNG) " + RAW DNG" else ""
+                        Log.d(TAG, "Captured frame$modeInfo: ${frameData.filename} (${frameData.fileSizeBytes} bytes) - Video time: ${frameData.videoRelativeTimeMs}ms, Est. frame: ${frameData.estimatedVideoFrame}, Sync quality: ${"%.3f".format(frameData.syncQuality)}")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error processing captured frame: ${e.message}", e)
                     }
                 }
             },
         )
+    }
+
+    /**
+     * Capture RAW DNG frame using efficient persistent session
+     */
+    private fun captureRawDngFrame(timestampNs: Long, rawDngDir: File): String? {
+        return try {
+            val rawDngManager = rgbCameraManager.getCamera2RawDngManager()
+            if (rawDngManager == null) {
+                Log.w(TAG, "Camera2 RAW DNG manager not available")
+                return null
+            }
+            
+            val rawFilename = "raw_${timestampNs}_${frameCount}.dng"
+            val rawOutputFile = File(rawDngDir, rawFilename)
+            
+            // Launch efficient RAW DNG frame capture using persistent session
+            scope.launch {
+                try {
+                    val success = rawDngManager.captureRawDngFrame(rawOutputFile)
+                    if (success) {
+                        Log.d(TAG, "RAW DNG frame captured: $rawFilename")
+                    } else {
+                        Log.w(TAG, "RAW DNG frame capture failed: $rawFilename")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error capturing RAW DNG frame: ${e.message}", e)
+                }
+            }
+            
+            rawFilename
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initiating RAW DNG frame capture: ${e.message}", e)
+            null
+        }
     }
 
     /**
@@ -418,7 +484,6 @@ class RgbCameraRecorder(
                     CameraSelector.DEFAULT_BACK_CAMERA
                 }
                 
-                // Update camera status for UI
                 _cameraStatus.value = rgbCameraManager.getCameraStatus()
                 
                 Log.i(TAG, "Switched to ${if (cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) "back" else "front"} camera")
@@ -505,4 +570,51 @@ class RgbCameraRecorder(
         val deviceModel: String,
         val timingStatistics: Map<String, Any>,
     )
+    
+    /**
+     * Check if RAW DNG recording is available on this device
+     */
+    fun supportsRawDng(): Boolean {
+        return rgbCameraManager.supportsRawDng()
+    }
+    
+    /**
+     * Check if device is Samsung with Camera2 Level 3 support
+     */
+    fun isSamsungLevel3Device(): Boolean {
+        return rgbCameraManager.isSamsungLevel3Device()
+    }
+    
+    /**
+     * Set the recording mode (Standard or RAW DNG)
+     */
+    fun setRecordingMode(mode: RecordingMode) {
+        if (_recordingStatus.value != RecordingStatus.IDLE) {
+            Log.w(TAG, "Cannot change recording mode while recording")
+            return
+        }
+        
+        // Only allow RAW DNG mode on supported devices
+        if (mode == RecordingMode.RAW_DNG && !supportsRawDng()) {
+            Log.w(TAG, "RAW DNG mode not supported on this device")
+            return
+        }
+        
+        recordingMode = mode
+        Log.i(TAG, "Recording mode set to: $mode")
+    }
+    
+    /**
+     * Get the current recording mode
+     */
+    fun getRecordingMode(): RecordingMode {
+        return recordingMode
+    }
+    
+    /**
+     * Get camera manager for advanced operations (internal use)
+     */
+    internal fun getCameraManager(): RgbCameraManager {
+        return rgbCameraManager
+    }
 }

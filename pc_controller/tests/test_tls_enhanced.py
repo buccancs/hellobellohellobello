@@ -138,7 +138,6 @@ class TestSecureConnectionManager:
             key_file = Path(temp_dir) / 'key.pem'
             ca_file = Path(temp_dir) / 'ca.pem'
 
-            # Create dummy cert files
             cert_data = "-----BEGIN CERTIFICATE-----\nDUMMY_CERT\n-----END CERTIFICATE-----\n"
             key_data = "-----BEGIN PRIVATE KEY-----\nDUMMY_KEY\n-----END PRIVATE KEY-----\n"
             ca_data = "-----BEGIN CERTIFICATE-----\nDUMMY_CA\n-----END CERTIFICATE-----\n"
@@ -161,10 +160,10 @@ class TestSecureConnectionManager:
         mock_socket = Mock()
         wrapped = manager.wrap_server_socket(mock_socket)
 
-        assert wrapped is mock_socket  # Should return original socket
+        assert wrapped is mock_socket
 
         wrapped = manager.wrap_client_socket(mock_socket)
-        assert wrapped is mock_socket  # Should return original socket
+        assert wrapped is mock_socket
 
     @patch('ssl.create_default_context')
     def test_create_server_context(self, mock_create_context, temp_certs):
@@ -266,7 +265,6 @@ class TestSecureConnectionManager:
         with pytest.raises(ConnectionError):
             manager.connect_secure('localhost', 8080)
 
-        # Should close socket on failure
         mock_socket.close.assert_called_once()
 
 
@@ -370,7 +368,6 @@ class TestSecureMessageHandler:
         manager = SecureConnectionManager(config)
         handler = SecureMessageHandler(manager)
 
-        # 11MB message length
         large_length = (11 * 1024 * 1024).to_bytes(4, 'big')
 
         mock_socket = Mock()
@@ -387,7 +384,7 @@ class TestSecureMessageHandler:
         handler = SecureMessageHandler(manager)
 
         mock_socket = Mock()
-        mock_socket.recv.return_value = b''  # Connection closed
+        mock_socket.recv.return_value = b''
 
         result = handler.receive_secure_message(mock_socket)
 
@@ -402,12 +399,11 @@ class TestSecureMessageHandler:
         message = b"test message that comes in chunks"
 
         mock_socket = Mock()
-        # Simulate receiving in chunks
         mock_socket.recv.side_effect = [
-            len(message).to_bytes(4, 'big'),  # Length
-            b"test message",                   # First chunk
-            b" that comes",                   # Second chunk
-            b" in chunks"                     # Final chunk
+            len(message).to_bytes(4, 'big'),
+            b"test message",
+            b" that comes",
+            b" in chunks"
         ]
 
         result = handler.receive_secure_message(mock_socket)
@@ -435,11 +431,9 @@ class TestSelfSignedCertificateGeneration:
                 days=30
             )
 
-            # Check files were created
             assert cert_file.exists()
             assert key_file.exists()
 
-            # Check file contents have PEM markers
             cert_content = cert_file.read_text()
             key_content = key_file.read_text()
 
@@ -461,18 +455,15 @@ class TestTLSIntegration:
         manager = SecureConnectionManager(config)
         handler = SecureMessageHandler(manager)
 
-        # Should work with plain sockets
         mock_socket = Mock()
         wrapped = manager.wrap_server_socket(mock_socket)
         assert wrapped is mock_socket
 
-        # Should send/receive without encryption
         result = handler.send_secure_message(mock_socket, b"test")
         assert result is True
 
     def test_tls_config_validation_workflow(self):
         """Test TLS configuration validation workflow."""
-        # Test missing files
         config = TLSConfig(
             enabled=True,
             cert_file='/nonexistent/cert.pem',
@@ -501,7 +492,6 @@ class TestTLSIntegration:
 
     def test_environment_configuration_integration(self):
         """Test integration with environment configuration."""
-        # Test with various environment combinations
         test_cases = [
             # Disabled case
             {

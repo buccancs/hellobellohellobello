@@ -21,7 +21,6 @@ object SessionDataValidator {
         val issues = mutableListOf<String>()
 
         try {
-            // Check if session metadata exists
             val metadataFile = File(sessionDir, "session_metadata.json")
             if (metadataFile.exists()) {
                 results["metadata"] = true
@@ -31,7 +30,6 @@ object SessionDataValidator {
                 issues.add("Missing session metadata file")
             }
 
-            // Validate subdirectories and expected files
             val subdirs = sessionDir.listFiles { file -> file.isDirectory }
             subdirs?.forEach { subdir ->
                 when (subdir.name.lowercase()) {
@@ -42,7 +40,6 @@ object SessionDataValidator {
                 }
             }
 
-            // Check for CSV timestamp consistency
             val csvFiles = sessionDir.walkTopDown()
                 .filter { it.isFile && it.name.endsWith(".csv") }
                 .toList()
@@ -70,7 +67,6 @@ object SessionDataValidator {
             val content = metadataFile.readText()
             val metadata = JSONObject(content)
 
-            // Check required fields
             val requiredFields = listOf(
                 "session_id",
                 "start_timestamp_ms",
@@ -85,7 +81,6 @@ object SessionDataValidator {
                 }
             }
 
-            // Validate timestamp ranges
             if (metadata.has("start_timestamp_ms") && metadata.has("start_timestamp_ns")) {
                 val timestampMs = metadata.getLong("start_timestamp_ms")
                 val timestampNs = metadata.getLong("start_timestamp_ns")
@@ -112,7 +107,6 @@ object SessionDataValidator {
         if (!framesDir.exists()) issues.add("Missing RGB frames directory")
         if (!csvFile.exists()) issues.add("Missing RGB CSV file")
 
-        // Validate CSV structure if exists
         if (csvFile.exists()) {
             validateCsvStructure(csvFile, listOf("timestamp_ns", "timestamp_ms", "frame_number", "filename"), issues)
         }
@@ -127,7 +121,6 @@ object SessionDataValidator {
 
         if (!csvFile.exists()) issues.add("Missing thermal CSV file")
 
-        // Validate CSV structure if exists
         if (csvFile.exists()) {
             validateCsvStructure(csvFile, listOf("timestamp_ns", "timestamp_ms", "frame_number"), issues)
         }
@@ -140,7 +133,6 @@ object SessionDataValidator {
 
         if (!csvFile.exists()) issues.add("Missing GSR CSV file")
 
-        // Validate CSV structure if exists
         if (csvFile.exists()) {
             validateCsvStructure(csvFile, listOf("timestamp_ns", "timestamp_ms"), issues)
         }
@@ -175,7 +167,6 @@ object SessionDataValidator {
     }
 
     private fun validateTimestampConsistency(csvFiles: List<File>, results: MutableMap<String, Boolean>, issues: MutableList<String>) {
-        // Check that all CSV files use consistent timestamp formats
         var hasConsistentTimestamps = true
 
         csvFiles.forEach { csvFile ->

@@ -28,14 +28,12 @@ class ShimmerRecorder(
     companion object {
         private const val TAG = "ShimmerRecorder"
         private const val SAMPLING_RATE_HZ = 128.0
-        private const val SAMPLE_INTERVAL_MS = 7L // ~128Hz
-        private const val GSR_RANGE_12BIT = 4095 // 12-bit ADC range (0-4095)
+        private const val SAMPLE_INTERVAL_MS = 7L
+        private const val GSR_RANGE_12BIT = 4095
     }
 
-    // Data processing utility
     private val dataProcessor = ShimmerDataProcessor()
 
-    // Recording state
     private var isRecording = false
     private var csvWriter: BufferedWriter? = null
     private var csvFile: File? = null
@@ -43,7 +41,6 @@ class ShimmerRecorder(
     private var recordingJob: Job? = null
     private var dataPointCount = 0
 
-    // Status reporting for UI reactivity
     private val _recordingStatus = MutableStateFlow(RecordingStatus.IDLE)
     val recordingStatus: StateFlow<RecordingStatus> = _recordingStatus.asStateFlow()
 
@@ -66,19 +63,15 @@ class ShimmerRecorder(
         _recordingStatus.value = RecordingStatus.STARTING
 
         try {
-            // Initialize enhanced ShimmerManager if available
             shimmerManager?.let { manager ->
                 if (!manager.initialize()) {
                     throw RuntimeException("Failed to initialize enhanced ShimmerManager")
                 }
                 
-                // Start scanning for Shimmer devices
                 manager.startScanning()
                 
-                // Wait a bit for scanning to find devices, then try to connect
                 delay(3000)
                 
-                // Try to connect to first discovered device or fallback
                 val discoveredDevices = manager.discoveredDevices.value
                 if (discoveredDevices.isNotEmpty()) {
                     val targetDevice = discoveredDevices.first()
@@ -88,7 +81,6 @@ class ShimmerRecorder(
                     Log.w(TAG, "No Shimmer devices discovered, will use simulation mode")
                 }
                 
-                // Update device connection manager with enhanced state
                 deviceConnectionManager?.updateShimmerState(
                     DeviceConnectionManager.DeviceState.CONNECTING,
                     DeviceConnectionManager.DeviceDetails(
@@ -100,11 +92,9 @@ class ShimmerRecorder(
                 )
             }
 
-            // Create CSV file for GSR data
             csvFile = File(sessionDir, "gsr.csv")
             csvWriter = BufferedWriter(FileWriter(csvFile!!))
 
-            // Use data processor for consistent header format
             csvWriter!!.write(dataProcessor.getCsvHeader() + "\n")
             csvWriter!!.flush()
 
@@ -113,7 +103,6 @@ class ShimmerRecorder(
 
             _recordingStatus.value = RecordingStatus.RECORDING
 
-            // Update device connection state to connected
             deviceConnectionManager?.updateShimmerState(
                 DeviceConnectionManager.DeviceState.CONNECTED,
                 DeviceConnectionManager.DeviceDetails(
@@ -151,17 +140,15 @@ class ShimmerRecorder(
         isRecording = false
 
         try {
-            // Stop recording job and wait for completion
             recordingJob?.apply {
                 cancel()
-                join() // Ensure proper cleanup
+                join()
             }
             recordingJob = null
 
-            // Flush and close CSV resources with proper error handling
             csvWriter?.apply {
                 try {
-                    flush() // Ensure all data is written
+                    flush()
                     close()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error closing CSV writer: ${e.message}", e)
@@ -170,13 +157,10 @@ class ShimmerRecorder(
             csvWriter = null
             csvFile = null
 
-            // Clean up ShimmerManager
             shimmerManager?.cleanup()
 
-            // Update device connection state
             deviceConnectionManager?.updateShimmerState(DeviceConnectionManager.DeviceState.DISCONNECTED)
 
-            // Cancel scope
             scope.cancel()
 
             _recordingStatus.value = RecordingStatus.IDLE
@@ -200,14 +184,11 @@ class ShimmerRecorder(
 
                 while (isActive && isRecording) {
                     try {
-                        // Generate simulated sensor sample using data processor format
                         val sample = generateSimulatedSample()
 
-                        // Use data processor for consistent CSV formatting
                         csvWriter?.apply {
                             write(dataProcessor.formatSampleForCsv(sample, dataPointCount) + "\n")
 
-                            // Flush every 50 samples for data integrity
                             if (dataPointCount % 50 == 0) {
                                 flush()
                             }
@@ -215,7 +196,6 @@ class ShimmerRecorder(
 
                         dataPointCount++
 
-                        // Update data rate for UI
                         if (dataPointCount % 128 == 0) {
                             val currentRate = calculateCurrentDataRate()
                             _dataRate.value = currentRate
@@ -237,32 +217,24 @@ class ShimmerRecorder(
     }
 
     private suspend fun captureEnhancedShimmerData() {
-        // Enhanced GSR simulation with realistic Shimmer3 GSR+ patterns
         val timestampNs = System.nanoTime()
         val timestampMs = System.currentTimeMillis()
 
-        // Generate realistic GSR data using actual Shimmer3 GSR+ characteristics
-        // Baseline GSR resistance: 10-100 kΩ typical range
-        val baselineGsr = 25.0 + (Random.nextDouble(-3.0, 3.0)) // 25kΩ ± 3kΩ baseline
+        val baselineGsr = 25.0 + (Random.nextDouble(-3.0, 3.0))
 
-        // Add realistic skin conductance variations
-        val timeBasedVariation = Math.sin((timestampMs / 1000.0) * 0.1) * 5.0 // Slow drift
-        val spontaneousFluctuations = Random.nextDouble(-2.0, 2.0) // Spontaneous SC responses
+        val timeBasedVariation = Math.sin((timestampMs / 1000.0) * 0.1) * 5.0
+        val spontaneousFluctuations = Random.nextDouble(-2.0, 2.0)
 
         val gsrKohms = (baselineGsr + timeBasedVariation + spontaneousFluctuations).coerceIn(5.0, 200.0)
 
-        // Convert to 12-bit ADC values (0-4095) as per Shimmer3 GSR+ specs
         val gsrRaw12bit = ((gsrKohms / 200.0) * GSR_RANGE_12BIT).toInt().coerceIn(0, GSR_RANGE_12BIT)
 
-        // Simulate PPG data (photoplethysmography) - typical range
-        val heartRateBpm = 72.0 + (Random.nextDouble(-8.0, 8.0)) // 72 ± 8 BPM
+        val heartRateBpm = 72.0 + (Random.nextDouble(-8.0, 8.0))
         val ppgWaveform = Math.sin((timestampMs / 1000.0) * (heartRateBpm / 60.0) * 2 * Math.PI)
-        val ppgRaw = ((ppgWaveform + 1.0) * 2047.5).toInt().coerceIn(0, 4095) // 12-bit range
+        val ppgRaw = ((ppgWaveform + 1.0) * 2047.5).toInt().coerceIn(0, 4095)
 
-        // Connection status - simulate good connection with occasional glitches
         val connectionStatus = if (Random.nextDouble() > 0.99) "WEAK_SIGNAL" else "CONNECTED"
 
-        // Write to CSV safely with null check and synchronization
         csvWriter?.let { writer ->
             synchronized(writer) {
                 try {
@@ -279,7 +251,6 @@ class ShimmerRecorder(
 
         dataPointCount++
 
-        // Log progress at 1-second intervals (128 samples at 128Hz)
         if (dataPointCount % 128 == 0) {
             val gsrKohmsFormatted = "%.3f".format(gsrKohms)
             Log.d(TAG, "Enhanced Shimmer data point $dataPointCount: GSR=${gsrKohmsFormatted}kΩ ($gsrRaw12bit/4095), PPG=$ppgRaw")
@@ -293,11 +264,9 @@ class ShimmerRecorder(
         val timestampNs = System.nanoTime()
         val timestampMs = System.currentTimeMillis()
 
-        // Simulate realistic GSR data with proper 12-bit range
-        val gsrRaw = Random.nextInt(512, 3584) // 12-bit ADC range subset
-        val gsrKohms = (gsrRaw / 4095.0) * 1000.0 // Convert to kOhms
+        val gsrRaw = Random.nextInt(512, 3584)
+        val gsrKohms = (gsrRaw / 4095.0) * 1000.0
 
-        // Simulate PPG data
         val ppgRaw = Random.nextInt(1500, 2500)
 
         return ShimmerDataProcessor.SensorSample(
@@ -316,7 +285,7 @@ class ShimmerRecorder(
      */
     private fun calculateCurrentDataRate(): Double {
         return if (dataPointCount > 0) {
-            SAMPLING_RATE_HZ // For simulation, return target rate
+            SAMPLING_RATE_HZ
         } else {
             0.0
         }

@@ -25,7 +25,6 @@ class NavigationController(
         const val TAB_FILE_MANAGER = 3
         const val TAB_COUNT = 4
 
-        // Navigation routes for enhanced routing
         const val ROUTE_RGB_PREVIEW = "rgb_preview"
         const val ROUTE_THERMAL_PREVIEW = "thermal_preview"
         const val ROUTE_THERMAL_SETTINGS = "thermal_settings"
@@ -47,7 +46,6 @@ class NavigationController(
             currentTabIndex = tabIndex
             viewPager.currentItem = tabIndex
 
-            // Track navigation history for better UX
             val routeName =
                 when (tabIndex) {
                     TAB_RGB_CAMERA -> ROUTE_RGB_PREVIEW
@@ -74,7 +72,6 @@ class NavigationController(
     fun navigateToThermalCamera(thermalState: ThermalNavigationState = ThermalNavigationState.PREVIEW) {
         navigateToTab(TAB_THERMAL_CAMERA, thermalState.route)
 
-        // Notify thermal fragment about the specific state
         val thermalFragment = getCurrentFragment() as? ThermalPreviewFragment
         thermalFragment?.handleNavigationState(thermalState)
     }
@@ -99,7 +96,7 @@ class NavigationController(
      */
     fun navigateBack(): Boolean {
         if (canNavigateBack()) {
-            navigationHistory.removeLastOrNull() // Remove current
+            navigationHistory.removeLastOrNull()
             val previousRoute = navigationHistory.lastOrNull()
 
             previousRoute?.let { route ->
@@ -128,13 +125,11 @@ class NavigationController(
     }
 
     private fun addToNavigationHistory(route: String) {
-        // Avoid duplicate consecutive entries
         if (navigationHistory.isEmpty() || navigationHistory.last() != route) {
             navigationHistory.add(route)
 
-            // Keep history manageable (max 10 entries)
             if (navigationHistory.size > 10) {
-                navigationHistory.removeAt(0) // Use removeAt(0) instead of removeFirst() for API compatibility
+                navigationHistory.removeAt(0)
             }
         }
     }

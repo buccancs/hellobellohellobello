@@ -21,27 +21,23 @@ class TestSimulatedShimmer:
         """Test basic shimmer simulation."""
         shimmer = SimulatedShimmer(sample_rate_hz=10)
 
-        # Should connect successfully
         assert shimmer.connect()
 
-        # Test data callback
         received_data = []
         def callback(timestamp_ns, gsr_value):
             received_data.append((timestamp_ns, gsr_value))
 
         shimmer.start_streaming(callback)
-        time.sleep(0.3)  # Let some samples accumulate
+        time.sleep(0.3)
         shimmer.stop_streaming()
         shimmer.disconnect()
 
-        # Should have received some data
         assert len(received_data) > 0
 
-        # Check data format
         timestamp, gsr = received_data[0]
         assert isinstance(timestamp, int)
         assert isinstance(gsr, float)
-        assert gsr > 0  # Reasonable GSR value
+        assert gsr > 0
 
 
 class TestRealShimmer:
@@ -57,7 +53,6 @@ class TestRealShimmer:
 
             shimmer = RealShimmer(device_port="COM3", sample_rate_hz=128)
 
-            # Should attempt connection
             shimmer.connect()
 
             # Verify shimmer was configured
@@ -66,29 +61,25 @@ class TestRealShimmer:
 
     def test_shimmer_unavailable_fallback(self):
         """Test fallback when shimmer library is not available."""
-        # This always works since we test the unavailable case
         with patch('core.shimmer_manager.SHIMMER_AVAILABLE', False):
             with pytest.raises(RuntimeError, match="pyshimmer library not available"):
                 RealShimmer()
 
     def test_gsr_conversion(self):
         """Test critical 12-bit GSR conversion."""
-        shimmer = SimulatedShimmer()  # Use simulation for conversion testing
+        shimmer = SimulatedShimmer()
 
-        # Test 12-bit ADC conversion (0-4095 range)
         test_cases = [
-            (0, 0.0),        # Minimum ADC
-            (2048, 15.0),    # Mid-range ADC
-            (4095, 20.0),    # Maximum ADC (12-bit)
+            (0, 0.0),
+            (2048, 15.0),
+            (4095, 20.0),
         ]
 
         for adc_value, _ in test_cases:
-            # Create a mock shimmer with conversion method
             if hasattr(shimmer, '_convert_gsr_to_microsiemens'):
                 result = shimmer._convert_gsr_to_microsiemens(adc_value)
                 assert result >= 0.0
-                # Should be reasonable GSR value
-                assert result < 100.0  # Typical human GSR range
+                assert result < 100.0
 
 
 class TestShimmerManager:
@@ -116,19 +107,16 @@ class TestShimmerManager:
             result = manager.initialize()
 
             assert result
-            # Should use real if available and connection succeeds
 
     def test_graceful_degradation(self):
         """Test graceful degradation when real hardware fails."""
         with patch('core.shimmer_manager.SHIMMER_AVAILABLE', True):
             with patch('core.shimmer_manager.RealShimmer') as mock_real:
-                # Make real shimmer fail
                 mock_real.return_value.connect.return_value = False
 
                 manager = ShimmerManager(prefer_real=True)
                 result = manager.initialize()
 
-                # Should fall back to simulation
                 assert result
                 assert not manager.is_real
 
@@ -138,12 +126,10 @@ class TestShimmerFactory:
 
     def test_create_shimmer_auto_detect(self):
         """Test automatic detection in factory."""
-        # Simulation case
         with patch('core.shimmer_manager.SHIMMER_AVAILABLE', False):
             shimmer = create_shimmer_manager(use_real=None)
             assert isinstance(shimmer, SimulatedShimmer)
 
-        # Real case (if available)
         if SHIMMER_AVAILABLE:
             with patch('core.shimmer_manager.cfg_get', return_value=True):
                 shimmer = create_shimmer_manager(use_real=None)
@@ -152,16 +138,13 @@ class TestShimmerFactory:
 
     def test_create_shimmer_explicit(self):
         """Test explicit shimmer type selection."""
-        # Force simulation
         shimmer = create_shimmer_manager(use_real=False)
         assert isinstance(shimmer, SimulatedShimmer)
 
-        # Force real (may fall back if unavailable)
         shimmer = create_shimmer_manager(use_real=True)
         if SHIMMER_AVAILABLE:
             assert isinstance(shimmer, RealShimmer)
         else:
-            # Should fall back to simulation
             assert isinstance(shimmer, SimulatedShimmer)
 
 
@@ -173,19 +156,15 @@ class TestCriticalRequirements:
         # This is a critical requirement from the project specifications
         SimulatedShimmer()
 
-        # Test that conversion uses 12-bit range (0-4095) not 16-bit
         test_values = [0, 1024, 2048, 3072, 4095]
 
         for adc_value in test_values:
-            # Simulate the conversion that should happen in real implementation
-            # This validates the algorithm is correct for 12-bit
             voltage = (adc_value / 4095.0) * 3.0  # 12-bit ADC, 3V reference
             assert 0.0 <= voltage <= 3.0
 
-            # Verify we're not using 16-bit range (65535) for non-zero values
-            if adc_value > 0:  # Skip comparison for 0 since both would be 0.0
-                wrong_voltage = (adc_value / 65535.0) * 3.0  # Wrong: 16-bit
-                assert voltage != wrong_voltage  # Should be different calculations
+            if adc_value > 0:
+                wrong_voltage = (adc_value / 65535.0) * 3.0
+                assert voltage != wrong_voltage
 
     def test_sampling_rate_compliance(self):
         """Test 128 Hz sampling rate compliance."""
@@ -197,18 +176,16 @@ class TestCriticalRequirements:
 
         shimmer.connect()
         shimmer.start_streaming(callback)
-        time.sleep(0.5)  # Collect data for 500ms
+        time.sleep(0.5)
         shimmer.stop_streaming()
         shimmer.disconnect()
 
         if len(received_data) > 1:
-            # Calculate actual sampling rate
-            timestamps = np.array(received_data) / 1e9  # Convert to seconds
+            timestamps = np.array(received_data) / 1e9
             intervals = np.diff(timestamps)
             avg_interval = np.mean(intervals)
             actual_rate = 1.0 / avg_interval
 
-            # Should be close to 128 Hz (within 10% tolerance)
             assert 115 <= actual_rate <= 140
 
     def test_microsiemens_output_range(self):
@@ -228,12 +205,9 @@ class TestCriticalRequirements:
         if received_values:
             gsr_array = np.array(received_values)
 
-            # Should be positive values
             assert np.all(gsr_array >= 0)
 
-            # Should be in reasonable human GSR range (1-100 µS typical)
-            assert np.all(gsr_array < 1000)  # Not impossibly high
+            assert np.all(gsr_array < 1000)
 
-            # Should have some variation (not constant)
             if len(received_values) > 10:
                 assert np.std(gsr_array) > 0

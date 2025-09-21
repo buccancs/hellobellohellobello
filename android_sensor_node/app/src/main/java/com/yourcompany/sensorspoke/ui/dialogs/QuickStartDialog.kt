@@ -38,14 +38,12 @@ class QuickStartDialog(
     }
 
     private fun setupDialog() {
-        // Create the dialog layout programmatically
         val layout =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(48, 48, 48, 48)
             }
 
-        // Title
         titleText =
             TextView(context).apply {
                 text = "Quick Start Guide"
@@ -55,14 +53,12 @@ class QuickStartDialog(
             }
         layout.addView(titleText)
 
-        // Step indicator dots
         stepIndicators =
             LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(0, 0, 0, 24)
             }
 
-        // Create step indicator dots
         for (i in steps.indices) {
             val dot =
                 View(context).apply {
@@ -76,7 +72,6 @@ class QuickStartDialog(
         }
         layout.addView(stepIndicators)
 
-        // Step title
         stepText =
             TextView(context).apply {
                 textSize = 18f
@@ -85,7 +80,6 @@ class QuickStartDialog(
             }
         layout.addView(stepText)
 
-        // Step description
         descriptionText =
             TextView(context).apply {
                 textSize = 16f
@@ -93,7 +87,6 @@ class QuickStartDialog(
             }
         layout.addView(descriptionText)
 
-        // Button layout
         val buttonLayout =
             LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -153,7 +146,6 @@ class QuickStartDialog(
             stepText.text = stepTitle
             descriptionText.text = stepDescription
 
-            // Update step indicators
             for (i in 0 until stepIndicators.childCount) {
                 val dot = stepIndicators.getChildAt(i)
                 dot.background =
@@ -162,7 +154,6 @@ class QuickStartDialog(
                     )
             }
 
-            // Update button states
             prevButton.isEnabled = currentStep > 0
 
             if (currentStep == steps.size - 1) {

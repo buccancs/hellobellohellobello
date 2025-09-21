@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 import pytest
 
-# Skip GUI tests when libraries not available
 pytest_plugins = []
 try:
     import importlib.util
@@ -20,7 +19,6 @@ class TestCalibrationDialog:
 
     def test_calibration_dialog_parameters(self):
         """Test calibration dialog parameter collection."""
-        # Skip GUI test in headless environment - functionality covered by validation tests
         pytest.skip("GUI components require display environment")
 
 
@@ -30,7 +28,6 @@ class TestExportDialog:
 
     def test_export_dialog_parameters(self):
         """Test export dialog parameter collection."""
-        # Skip GUI test in headless environment - functionality is covered by ExportWorkflow tests
         pytest.skip("GUI components require display environment")
 
 
@@ -47,7 +44,6 @@ class TestCalibrationWorkflow:
             "square_size": 0.025
         }
 
-        # These would be validated in the actual GUI workflow
         assert valid_params["board_width"] > 0
         assert valid_params["board_height"] > 0
         assert valid_params["square_size"] > 0
@@ -61,7 +57,6 @@ class TestCalibrationWorkflow:
         import numpy as np
         from tools.camera_calibration import CalibrationResult
 
-        # Setup mocks
         mock_isdir.return_value = True
         mock_result = CalibrationResult(
             camera_matrix=np.eye(3),
@@ -81,11 +76,9 @@ class TestCalibrationWorkflow:
             "square_size": 0.025
         }
 
-        # This simulates the workflow that would run in GUI
         (params["board_width"], params["board_height"])
         result = mock_calibrate.return_value
 
-        # Verify the workflow would call correct functions
         assert result.rms_error == 0.5
         assert result.board_size == (9, 6)
 
@@ -93,13 +86,11 @@ class TestCalibrationWorkflow:
         """Test calibration dialog can be created without crashing."""
         try:
             from pc_controller.src.gui.calibration_dialog import CalibrationDialog
-            # Just test import and class creation without actually showing UI
             dialog_class = CalibrationDialog
             assert dialog_class is not None
             print("CalibrationDialog class successfully imported")
         except ImportError as e:
             if "EGL" in str(e) or "display" in str(e).lower():
-                # Expected in headless environment
                 print("Skipping GUI test in headless environment")
             else:
                 raise
@@ -108,10 +99,9 @@ class TestCalibrationWorkflow:
 
     def test_calibration_parameters_defaults(self):
         """Test that calibration has sensible default parameters."""
-        # Test the expected default values that would be in the dialog
         default_board_width = 9
         default_board_height = 6
-        default_square_size = 0.025  # 25mm
+        default_square_size = 0.025
 
         assert default_board_width > 2
         assert default_board_height > 2
@@ -132,7 +122,6 @@ class TestExportWorkflow:
             "formats": ["HDF5", "CSV"]
         }
 
-        # These would be validated in the actual GUI workflow
         assert isinstance(valid_params["session_dir"], str)
         assert isinstance(valid_params["output_dir"], str)
         assert isinstance(valid_params["formats"], list)
@@ -142,7 +131,6 @@ class TestExportWorkflow:
         """Test that all expected export formats are supported."""
         supported_formats = ["HDF5", "CSV", "MP4"]
 
-        # Verify format list
         assert "HDF5" in supported_formats
         assert "CSV" in supported_formats
         assert "MP4" in supported_formats
@@ -151,7 +139,6 @@ class TestExportWorkflow:
     @patch('os.path.isdir')
     def test_export_workflow_hdf5(self, mock_isdir, mock_export):
         """Test HDF5 export workflow."""
-        # Setup mocks
         mock_isdir.return_value = True
 
         # Test parameters
@@ -161,15 +148,11 @@ class TestExportWorkflow:
             "formats": ["HDF5"]
         }
 
-        # Simulate export workflow
         if "HDF5" in params["formats"]:
             out_path = os.path.join(params["output_dir"], "export.h5")
             meta = {"session_dir": params["session_dir"]}
 
-            # This would be called in the actual workflow
-            # mock_export(params["session_dir"], out_path, metadata=meta, annotations=ann)
 
-        # Verify the workflow structure is correct
         assert out_path.endswith("export.h5")
         assert meta["session_dir"] == params["session_dir"]
 
@@ -179,7 +162,6 @@ class TestUserExperienceEnhancements:
 
     def test_error_message_improvements(self):
         """Test that error messages are user-friendly."""
-        # Examples of technical vs user-friendly messages
         technical_errors = {
             "FileNotFoundError": "File location not found",
             "ConnectionRefusedError": "Unable to connect to device",
@@ -188,14 +170,12 @@ class TestUserExperienceEnhancements:
         }
 
         for user_message in technical_errors.values():
-            # Verify user messages are descriptive and actionable
             assert len(user_message) > 10
-            assert not user_message.isupper()  # Not all caps
+            assert not user_message.isupper()
             assert "Error" not in user_message or "failed" in user_message.lower()
 
     def test_file_location_indicators(self):
         """Test file location indicator functionality."""
-        # Simulate showing export directory
         test_directories = [
             "/home/user/data/session_20241221",
             "C:\\Users\\researcher\\Documents\\exports",
@@ -203,7 +183,6 @@ class TestUserExperienceEnhancements:
         ]
 
         for directory in test_directories:
-            # This would be shown in the UI as export location
             location_message = f"Exporting to: {directory}"
             assert directory in location_message
             assert "Exporting to:" in location_message

@@ -46,13 +46,11 @@ class FileTransferManager(
 
         val deviceId = deviceIdOverride ?: (Build.MODEL ?: "device").replace(" ", "_")
         val socket = Socket()
-        // 2s connect timeout; 5s read timeout to avoid hangs in tests/CI
         socket.connect(InetSocketAddress(host, port), 2000)
         socket.tcpNoDelay = true
         socket.soTimeout = 5000
         socket.use {
             val out = BufferedOutputStream(it.getOutputStream())
-            // Send header JSON line first (avoid org.json for JVM tests)
             val headerLine =
                 "{" +
                     "\"session_id\":\"$sessionId\"," +
@@ -61,10 +59,8 @@ class FileTransferManager(
                     "}"
             out.write((headerLine + "\n").toByteArray(Charsets.UTF_8))
             out.flush()
-            // Now stream ZIP content
             ZipOutputStream(out).use { zos ->
                 zipDirectoryContents(dir, dir, zos)
-                // Also include flash_sync_events.csv if present (override or derived)
                 try {
                     val flash: File? =
                         flashEventsFileOverride ?: run {
@@ -91,7 +87,6 @@ class FileTransferManager(
                         zos.closeEntry()
                     }
                 } catch (_: Exception) {
-                    // best-effort inclusion
                 }
                 zos.finish()
                 zos.flush()

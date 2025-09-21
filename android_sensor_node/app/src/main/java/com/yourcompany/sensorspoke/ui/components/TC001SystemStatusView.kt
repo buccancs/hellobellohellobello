@@ -7,7 +7,7 @@ import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.cardview.widget.CardView
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001IntegrationState
+import com.yourcompany.sensorspoke.sensors.thermal.TC001IntegrationState
 
 /**
  * TC001SystemStatusView - Comprehensive thermal system status display
@@ -34,19 +34,16 @@ constructor(
     private val systemHealthIndicator: TextView
 
     init {
-        // Setup card appearance
         radius = 12f
         cardElevation = 4f
         setCardBackgroundColor(Color.parseColor("#1E1E1E"))
 
-        // Create container
         statusContainer =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(16, 12, 16, 12)
             }
 
-        // System status
         systemStatusText =
             TextView(context).apply {
                 text = "TC001 System: Initializing"
@@ -56,7 +53,6 @@ constructor(
             }
         statusContainer.addView(systemStatusText)
 
-        // Connection status
         connectionStatusText =
             TextView(context).apply {
                 text = "Device: Not Connected"
@@ -67,7 +63,6 @@ constructor(
             }
         statusContainer.addView(connectionStatusText)
 
-        // Data processing status
         dataProcessingStatusText =
             TextView(context).apply {
                 text = "Processing: Stopped"
@@ -78,7 +73,6 @@ constructor(
             }
         statusContainer.addView(dataProcessingStatusText)
 
-        // Temperature status
         temperatureStatusText =
             TextView(context).apply {
                 text = "Temperature: N/A"
@@ -89,7 +83,6 @@ constructor(
             }
         statusContainer.addView(temperatureStatusText)
 
-        // System health indicator
         systemHealthIndicator =
             TextView(context).apply {
                 text = "● System Status"

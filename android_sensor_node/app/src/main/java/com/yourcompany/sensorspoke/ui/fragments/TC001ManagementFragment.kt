@@ -10,19 +10,19 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-// R import handled automatically
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001CalibrationManager
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001CalibrationType
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001DataExporter
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001DiagnosticSystem
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001DiagnosticTestResult
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001ExportFormat
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001HealthStatus
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001IntegrationManager
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001IntegrationState
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001PerformanceMetrics
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001PerformanceMonitor
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001SystemHealth
+import com.yourcompany.sensorspoke.R
+import com.yourcompany.sensorspoke.sensors.thermal.TC001CalibrationManager
+import com.yourcompany.sensorspoke.sensors.thermal.TC001CalibrationType
+import com.yourcompany.sensorspoke.sensors.thermal.TC001DataExporter
+import com.yourcompany.sensorspoke.sensors.thermal.TC001DiagnosticSystem
+import com.yourcompany.sensorspoke.sensors.thermal.TC001DiagnosticTestResult
+import com.yourcompany.sensorspoke.sensors.thermal.TC001ExportFormat
+import com.yourcompany.sensorspoke.sensors.thermal.TC001HealthStatus
+import com.yourcompany.sensorspoke.sensors.thermal.TC001IntegrationManager
+import com.yourcompany.sensorspoke.sensors.thermal.TC001IntegrationState
+import com.yourcompany.sensorspoke.sensors.thermal.TC001PerformanceMetrics
+import com.yourcompany.sensorspoke.sensors.thermal.TC001PerformanceMonitor
+import com.yourcompany.sensorspoke.sensors.thermal.TC001SystemHealth
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -44,7 +44,6 @@ class TC001ManagementFragment : Fragment() {
     private var calibrationManager: TC001CalibrationManager? = null
     private var dataExporter: TC001DataExporter? = null
 
-    // UI Components
     private var systemStatusText: TextView? = null
     private var performanceMetricsText: TextView? = null
     private var connectionStatusText: TextView? = null
@@ -52,14 +51,12 @@ class TC001ManagementFragment : Fragment() {
     private var frameRateText: TextView? = null
     private var memoryUsageText: TextView? = null
 
-    // Control buttons
     private var btnStartSystem: Button? = null
     private var btnStopSystem: Button? = null
     private var btnRunDiagnostics: Button? = null
     private var btnStartCalibration: Button? = null
     private var btnExportData: Button? = null
 
-    // Status indicators
     private var statusIndicatorConnection: View? = null
     private var statusIndicatorProcessing: View? = null
     private var statusIndicatorCalibration: View? = null
@@ -86,14 +83,12 @@ class TC001ManagementFragment : Fragment() {
      * Initialize UI components
      */
     private fun initializeUI(view: View) {
-        // Create management interface programmatically
         val mainContainer =
             LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(16, 16, 16, 16)
             }
 
-        // System Status Section
         mainContainer.addView(createSectionHeader("TC001 System Status"))
 
         systemStatusText =
@@ -104,7 +99,6 @@ class TC001ManagementFragment : Fragment() {
             }
         mainContainer.addView(systemStatusText)
 
-        // Connection indicators
         val indicatorLayout =
             LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -143,7 +137,6 @@ class TC001ManagementFragment : Fragment() {
             }
         mainContainer.addView(temperatureDisplayText)
 
-        // Control Buttons Section
         mainContainer.addView(createSectionHeader("System Controls"))
 
         val buttonLayout =
@@ -184,7 +177,6 @@ class TC001ManagementFragment : Fragment() {
 
         mainContainer.addView(buttonLayout)
 
-        // Add to parent view
         (view as? ViewGroup)?.addView(mainContainer)
     }
 
@@ -465,7 +457,6 @@ class TC001ManagementFragment : Fragment() {
                 TC001HealthStatus.POOR -> Color.RED
             }
 
-        // Update all indicators with health status
         updateConnectionIndicator(health.connectionQuality > 70)
         updateProcessingIndicator(health.frameRate > 15)
     }
@@ -496,7 +487,6 @@ class TC001ManagementFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // Auto-refresh system status
         refreshSystemStatus()
     }
 
@@ -506,15 +496,12 @@ class TC001ManagementFragment : Fragment() {
     private fun refreshSystemStatus() {
         lifecycleScope.launch {
             try {
-                // Check if system is ready
                 val isReady = integrationManager?.isSystemReady() ?: false
                 systemStatusText?.text = if (isReady) "System: Ready" else "System: Not Ready"
 
-                // Update button states
                 btnStartSystem?.isEnabled = !isReady
                 btnStopSystem?.isEnabled = isReady
 
-                // Check calibration status
                 val calibration = calibrationManager?.getCurrentCalibration()
                 val isCalibrated = calibration != null && calibrationManager?.isCalibrationValid() ?: false
                 updateCalibrationIndicator(isCalibrated)
@@ -527,7 +514,6 @@ class TC001ManagementFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
 
-        // Cleanup TC001 components
         lifecycleScope.launch {
             performanceMonitor?.stopMonitoring()
             integrationManager?.cleanup()

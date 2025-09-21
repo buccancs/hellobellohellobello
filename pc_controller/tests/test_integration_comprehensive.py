@@ -88,7 +88,6 @@ class MockAndroidDevice:
                     if response:
                         client.send((json.dumps(response) + '\n').encode('utf-8'))
                 except Exception as e:
-                    # Send error response
                     error_response = {
                         "error": str(e),
                         "id": parsed.get("id", -1) if 'parsed' in locals() else -1
@@ -151,23 +150,18 @@ class TestHubSpokeIntegration:
 
     def test_device_discovery_and_capability_exchange(self):
         """Test device discovery and capability exchange."""
-        # Create mock Android device
         mock_device = MockAndroidDevice("test-device-001")
         port = mock_device.start_server()
         self.mock_devices.append(mock_device)
 
-        # Give it time to start
         time.sleep(0.1)
 
-        # Simulate device discovery and capability query
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
             client.connect(("localhost", port))
 
-            # Send capability query
             query = build_query_capabilities(1)
             client.send(query.encode('utf-8'))
 
-            # Receive response
             response = client.recv(1024).decode('utf-8')
             parsed_response = json.loads(response.strip())
 
@@ -178,7 +172,6 @@ class TestHubSpokeIntegration:
 
     def test_synchronized_recording_start_stop(self):
         """Test synchronized recording across multiple devices."""
-        # Create multiple mock devices
         devices = []
         for i in range(3):
             device = MockAndroidDevice(f"device-{i+1}")
@@ -186,9 +179,8 @@ class TestHubSpokeIntegration:
             devices.append((device, port))
             self.mock_devices.append(device)
 
-        time.sleep(0.1)  # Let servers start
+        time.sleep(0.1)
 
-        # Connect to all devices
         clients = []
         for _, port in devices:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -198,12 +190,10 @@ class TestHubSpokeIntegration:
         try:
             session_id = "test-session-123"
 
-            # Send start recording to all devices
             for i, client in enumerate(clients):
                 start_cmd = build_start_recording(session_id, i + 1)
                 client.send(start_cmd.encode('utf-8'))
 
-            # Verify all devices started recording
             for i, client in enumerate(clients):
                 response = client.recv(1024).decode('utf-8')
                 parsed = json.loads(response.strip())
@@ -211,12 +201,10 @@ class TestHubSpokeIntegration:
                 assert parsed["session_id"] == session_id
                 assert devices[i][0].recording is True
 
-            # Send stop recording to all devices
             for i, client in enumerate(clients):
                 stop_cmd = build_stop_recording(i + 10)
                 client.send(stop_cmd.encode('utf-8'))
 
-            # Verify all devices stopped recording
             for i, client in enumerate(clients):
                 response = client.recv(1024).decode('utf-8')
                 parsed = json.loads(response.strip())
@@ -231,16 +219,13 @@ class TestHubSpokeIntegration:
         """Test device timeout detection and recovery."""
         device_id = "timeout-test-device"
 
-        # Register device and update heartbeat
         self.device_manager.register(device_id)
         assert self.device_manager.get_status(device_id) == "Online"
 
-        # Simulate timeout
-        future_time = time.time_ns() + int(10 * 1e9)  # 10 seconds in future
+        future_time = time.time_ns() + int(10 * 1e9)
         self.device_manager.check_timeouts(now_ns=future_time)
         assert self.device_manager.get_status(device_id) == "Offline"
 
-        # Simulate recovery with heartbeat
         self.device_manager.update_heartbeat(device_id)
         assert self.device_manager.get_status(device_id) == "Online"
 
@@ -255,10 +240,8 @@ class TestHubSpokeIntegration:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
             client.connect(("localhost", port))
 
-            # Send malformed JSON
             client.send(b"invalid json data\n")
 
-            # Should receive error response
             response = client.recv(1024).decode('utf-8')
             parsed = json.loads(response.strip())
             assert "error" in parsed
@@ -268,7 +251,6 @@ class TestHubSpokeIntegration:
         num_devices = 5
         devices_and_ports = []
 
-        # Create multiple devices
         for i in range(num_devices):
             device = MockAndroidDevice(f"concurrent-device-{i+1}")
             port = device.start_server()
@@ -282,7 +264,6 @@ class TestHubSpokeIntegration:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
                 client.connect(("localhost", port))
 
-                # Query capabilities
                 query = build_query_capabilities(device_index)
                 client.send(query.encode('utf-8'))
                 response = client.recv(1024).decode('utf-8')
@@ -292,7 +273,6 @@ class TestHubSpokeIntegration:
                 assert parsed["status"] == "success"
                 return parsed
 
-        # Use threads to communicate concurrently
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_devices) as executor:
             futures = []
@@ -300,10 +280,8 @@ class TestHubSpokeIntegration:
                 future = executor.submit(communicate_with_device, device_port, i + 1)
                 futures.append(future)
 
-            # Wait for all communications to complete
             results = [future.result() for future in concurrent.futures.as_completed(futures)]
 
-            # Verify all communications succeeded
             assert len(results) == num_devices
             for result in results:
                 assert result["status"] == "success"
@@ -315,28 +293,21 @@ class TestMultiComponentIntegration:
     @pytest.mark.asyncio
     async def test_time_synchronization_integration(self):
         """Test time synchronization between Hub and Spokes."""
-        # Test the actual asyncio time server
         time_server = TimeSyncServer(port=12345)
 
-        # Start the server
         await time_server.start()
 
-        # Give server time to bind
         await asyncio.sleep(0.1)
 
-        # Create a UDP client to test the server
         transport, protocol = await asyncio.get_event_loop().create_datagram_endpoint(
             asyncio.DatagramProtocol, remote_addr=('localhost', 12345)
         )
 
         try:
-            # Send time sync request
             transport.sendto(b'time_sync')
 
-            # The server should respond with a timestamp
-            await asyncio.sleep(0.1)  # Allow time for response
+            await asyncio.sleep(0.1)
 
-            # Verify server is running (basic test)
             assert time_server.is_running()
 
         finally:
@@ -348,13 +319,11 @@ class TestMultiComponentIntegration:
         session_manager = SessionManager()
         device_manager = DeviceManager()
 
-        # Register devices
         devices = ["device-1", "device-2", "device-3"]
         for device_id in devices:
             device_manager.register(device_id)
             device_manager.set_status(device_id, "Connected")
 
-        # Start session
         session_manager.create_session("test_session")
         session_manager.start_recording()
         assert session_manager.is_active
@@ -363,7 +332,6 @@ class TestMultiComponentIntegration:
         for device_id in devices:
             device_manager.set_status(device_id, "Recording")
 
-        # Verify all devices are recording
         recording_devices = [
             device_id for device_id in devices
             if device_manager.get_status(device_id) == "Recording"
@@ -371,7 +339,6 @@ class TestMultiComponentIntegration:
 
         assert len(recording_devices) == len(devices)
 
-        # Stop session
         session_manager.stop_recording()
         assert not session_manager.is_active
 
@@ -379,28 +346,22 @@ class TestMultiComponentIntegration:
         """Test heartbeat manager integration with device manager."""
         device_manager = DeviceManager(heartbeat_timeout_seconds=2)
 
-        # Create heartbeat manager that updates device manager
         def heartbeat_callback(device_id: str):
             device_manager.update_heartbeat(device_id)
 
         heartbeat_manager = HeartbeatManager(callback=heartbeat_callback)
 
-        # Send heartbeats
         devices = ["hb-device-1", "hb-device-2"]
         for device_id in devices:
-            # Register devices in device manager first
             device_manager.register(device_id)
             heartbeat_manager.record_heartbeat(device_id)
 
-        # Verify devices are registered and online
         for device_id in devices:
             assert device_manager.get_status(device_id) == "Online"
 
-        # Simulate timeout
-        future_time = time.time_ns() + int(3 * 1e9)  # 3 seconds
+        future_time = time.time_ns() + int(3 * 1e9)
         device_manager.check_timeouts(now_ns=future_time)
 
-        # Verify devices timed out
         for device_id in devices:
             assert device_manager.get_status(device_id) == "Offline"
 
@@ -411,39 +372,30 @@ class TestSystemIntegration:
 
     def test_end_to_end_recording_workflow(self):
         """Test complete end-to-end recording workflow."""
-        # This would be a comprehensive test of the entire system
-        # from device discovery to data export
 
         device_manager = DeviceManager()
         session_manager = SessionManager()
 
-        # 1. Device Discovery Phase
         test_devices = ["android-1", "android-2"]
         for device_id in test_devices:
             device_manager.register(device_id)
             assert device_manager.get_status(device_id) == "Online"
 
-        # 2. Capability Exchange Phase
 
-        # 3. Session Start Phase
         session_manager.create_session("endtoend_test")
         session_manager.start_recording()
         assert session_manager.is_active
 
-        # 4. Recording Phase
         for device_id in test_devices:
             device_manager.set_status(device_id, "Recording")
 
-        # Verify all devices are recording
         recording_count = sum(1 for device_id in test_devices
                             if device_manager.get_status(device_id) == "Recording")
         assert recording_count == len(test_devices)
 
-        # 5. Session Stop Phase
         session_manager.stop_recording()
         assert not session_manager.is_active
 
-        # 6. Cleanup Phase
         for device_id in test_devices:
             device_manager.set_status(device_id, "Idle")
 
@@ -452,7 +404,6 @@ class TestSystemIntegration:
         device_manager = DeviceManager(heartbeat_timeout_seconds=1)
         session_manager = SessionManager()
 
-        # Start session with multiple devices
         devices = ["fault-device-1", "fault-device-2", "fault-device-3"]
         for device_id in devices:
             device_manager.register(device_id)
@@ -461,75 +412,62 @@ class TestSystemIntegration:
         session_manager.create_session("fault_tolerance_test")
         session_manager.start_recording()
 
-        # Simulate one device failure (timeout) by advancing time
         failed_device = devices[1]
-        future_time = time.time_ns() + int(2 * 1e9)  # 2 seconds in the future
+        future_time = time.time_ns() + int(2 * 1e9)
 
-        # Update heartbeats for the devices that should stay online
-        # We need to update their heartbeat to the future time minus a small margin
-        # so they don't timeout
         for device_id in [devices[0], devices[2]]:
             device_info = device_manager.get_info(device_id)
             if device_info:
-                # Set heartbeat to just within the timeout window
-                device_info.last_heartbeat_ns = future_time - int(0.5 * 1e9)  # 0.5 seconds ago
+                device_info.last_heartbeat_ns = future_time - int(0.5 * 1e9)
                 device_info.status = "Recording"
 
         device_manager.check_timeouts(now_ns=future_time)
 
-        # Verify failed device is offline
         assert device_manager.get_status(failed_device) == "Offline"
 
-        # Other devices should still be recording
         for device_id in [devices[0], devices[2]]:
             assert device_manager.get_status(device_id) == "Recording"
 
-        # Simulate device recovery
         device_manager.update_heartbeat(failed_device)
         device_manager.set_status(failed_device, "Recording")
         assert device_manager.get_status(failed_device) == "Recording"
 
-        # Session should still be active
         assert session_manager.is_active
 
     def test_performance_under_load(self):
         """Test system performance with many devices and operations."""
         device_manager = DeviceManager(heartbeat_timeout_seconds=10)
 
-        # Register many devices
         num_devices = 50
         devices = [f"perf-device-{i:03d}" for i in range(num_devices)]
 
         start_time = time.time()
 
-        # Batch register devices
         for device_id in devices:
             device_manager.register(device_id)
 
         registration_time = time.time() - start_time
 
-        # Batch heartbeat updates
         start_time = time.time()
         for device_id in devices:
             device_manager.update_heartbeat(device_id)
 
         heartbeat_time = time.time() - start_time
 
-        # Verify all devices are online
         online_count = sum(1 for device_id in devices
                           if device_manager.get_status(device_id) == "Online")
         assert online_count == num_devices
 
         # Performance assertions (should handle 50 devices quickly)
-        assert registration_time < 1.0  # Should register 50 devices in < 1s
-        assert heartbeat_time < 1.0     # Should update 50 heartbeats in < 1s
+        assert registration_time < 1.0
+        assert heartbeat_time < 1.0
 
         # Test timeout checking performance
         start_time = time.time()
         device_manager.check_timeouts()
         timeout_check_time = time.time() - start_time
 
-        assert timeout_check_time < 0.1  # Should check 50 device timeouts in < 100ms
+        assert timeout_check_time < 0.1
 
 
 if __name__ == "__main__":

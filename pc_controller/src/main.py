@@ -23,8 +23,8 @@ from PyQt6.QtWidgets import QApplication
 
 from .gui.gui_manager import GUIManager
 from .network.network_controller import NetworkController
-from .network.time_server import TimeSyncServer
 from .network.tcp_command_server import TCPCommandServer
+from .network.time_server import TimeSyncServer
 
 
 def _time_server_thread(stop_flag: threading.Event) -> None:
@@ -41,31 +41,35 @@ def _time_server_thread(stop_flag: threading.Event) -> None:
     try:
         asyncio.run(_runner())
     except Exception:
-        # On exit or unexpected error, just return; app shutdown will proceed
         return
 
 
 def main() -> int:
     app = QApplication(sys.argv)
 
-    # Start TimeSyncServer in background thread
     _stop_flag = threading.Event()
     _ts_thread = threading.Thread(
         target=_time_server_thread, args=(_stop_flag,), daemon=True
     )
     _ts_thread.start()
 
-    # Start TCP Command Server for enhanced communication
     tcp_server = TCPCommandServer(host="0.0.0.0", port=8080)
     tcp_server.start()
 
     network = NetworkController()
     gui = GUIManager(network)
+    
+    tcp_server.set_device_callbacks(
+        device_registered_callback=gui.on_device_registered,
+        device_status_callback=gui.on_device_status_updated,
+        live_gsr_callback=gui.on_live_gsr_data,
+        live_video_callback=gui.on_live_video_frame,
+        live_thermal_callback=gui.on_live_thermal_frame
+    )
 
     gui.show()
     code = app.exec()
 
-    # Ensure proper shutdown
     network.shutdown()
     tcp_server.stop()
     try:

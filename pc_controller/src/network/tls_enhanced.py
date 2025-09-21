@@ -192,7 +192,6 @@ class SecureConnectionManager:
         """Create SSL context for server operations."""
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
 
-        # Load server certificate and key
         context.load_cert_chain(self.config.cert_file, self.config.key_file)
 
         # Configure client verification
@@ -204,10 +203,9 @@ class SecureConnectionManager:
             logger.warning("Client certificate verification disabled")
 
         # Security settings
-        context.check_hostname = False  # Server doesn't check its own hostname
+        context.check_hostname = False
         context.minimum_version = ssl.TLSVersion.TLSv1_2
 
-        # Prefer secure cipher suites
         context.set_ciphers(
             "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS"
         )
@@ -223,11 +221,9 @@ class SecureConnectionManager:
         context.check_hostname = self.config.check_hostname
         context.verify_mode = self.config.verify_mode
 
-        # Load CA certificates if provided
         if self.config.ca_file:
             context.load_verify_locations(cafile=self.config.ca_file)
 
-        # Load client certificate if provided
         if self.config.cert_file and self.config.key_file:
             context.load_cert_chain(self.config.cert_file, self.config.key_file)
             logger.info("Client certificate loaded for mutual TLS")
@@ -263,13 +259,11 @@ def generate_self_signed_cert(
         logger.error(msg)
         raise
 
-    # Generate private key
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
     )
 
-    # Create certificate
     subject = issuer = x509.Name(
         [
             x509.NameAttribute(NameOID.COMMON_NAME, hostname),
@@ -287,7 +281,9 @@ def generate_self_signed_cert(
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.now(datetime.UTC))
-        .not_valid_after(datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=days))
+        .not_valid_after(
+            datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=days)
+        )
         .add_extension(
             x509.SubjectAlternativeName([x509.DNSName(hostname)]),
             critical=False,
@@ -295,7 +291,6 @@ def generate_self_signed_cert(
         .sign(private_key, hashes.SHA256())
     )
 
-    # Write private key
     with open(key_file, "wb") as f:
         f.write(
             private_key.private_bytes(
@@ -305,7 +300,6 @@ def generate_self_signed_cert(
             )
         )
 
-    # Write certificate
     with open(cert_file, "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
@@ -332,14 +326,12 @@ class SecureMessageHandler:
             True if successful, False otherwise
         """
         try:
-            # Send message length first (4 bytes, big-endian)
             length = len(message)
             length_bytes = length.to_bytes(4, "big")
 
             sock.sendall(length_bytes)
             sock.sendall(message)
 
-            # Log TLS status
             if isinstance(sock, ssl.SSLSocket):
                 cipher = sock.cipher()
                 logger.debug(f"Secure message sent using {cipher[0]} ({cipher[1]})")
@@ -366,20 +358,17 @@ class SecureMessageHandler:
         try:
             sock.settimeout(timeout)
 
-            # Receive message length first
             length_bytes = self._receive_exactly(sock, 4)
             if not length_bytes:
                 return None
 
             length = int.from_bytes(length_bytes, "big")
-            if length > 10 * 1024 * 1024:  # 10MB limit
+            if length > 10 * 1024 * 1024:
                 logger.error(f"Message too large: {length} bytes")
                 return None
 
-            # Receive message content
             message = self._receive_exactly(sock, length)
 
-            # Log TLS status
             if isinstance(sock, ssl.SSLSocket):
                 cipher = sock.cipher()
                 logger.debug(f"Secure message received using {cipher[0]} ({cipher[1]})")

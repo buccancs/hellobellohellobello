@@ -46,7 +46,6 @@ def create_client_ssl_context() -> ssl.SSLContext | None:
 
     check_hostname = os.environ.get("PC_TLS_CHECK_HOSTNAME", "1") == "1"
     ctx.check_hostname = check_hostname
-    # If no CA is provided, still allow system CAs; if absolutely no CA and
     # CERT_REQUIRED would fail, tests should keep TLS disabled. Here we stick to
     # CERT_REQUIRED assuming CA is present when enabled.
     ctx.verify_mode = ssl.CERT_REQUIRED
@@ -88,7 +87,6 @@ def create_server_ssl_context() -> ssl.SSLContext | None:
             ctx.load_verify_locations(cafile=ca_file)
         else:
             # If requested but no CA configured, relax to CERT_NONE to avoid
-            # deadlock; log via print.
             print(
                 "[TLS] PC_TLS_REQUIRE_CLIENT_CERT=1 but no CA provided; "
                 "disabling client verification"

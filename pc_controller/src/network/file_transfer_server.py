@@ -45,8 +45,7 @@ class _Header:
         session_id = str(obj.get("session_id") or "unknown_session")
         filename = str(obj.get("filename") or "data.bin")
         size = obj.get("size")
-        
-        # Safe integer conversion with error handling
+
         size_i: int | None = None
         if size is not None:
             try:
@@ -54,8 +53,9 @@ class _Header:
             except (ValueError, TypeError):
                 # Log warning but continue with None size
                 import logging
+
                 logging.warning(f"Invalid size value in file transfer header: {size}")
-        
+
         device_id = str(obj.get("device_id") or "unknown_device")
         return _Header(
             session_id=session_id, filename=filename, size=size_i, device_id=device_id
@@ -124,7 +124,6 @@ class FileTransferServer:
             with open(meta_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
         except Exception:
-            # best-effort; ignore failures to keep server robust
             pass
 
     def _serve(self) -> None:
@@ -144,7 +143,6 @@ class FileTransferServer:
                         if self._stop_ev.is_set():
                             break
                         continue
-                    # handle one connection
                     try:
                         with conn:
                             conn.settimeout(10.0)
@@ -175,7 +173,6 @@ class FileTransferServer:
                                             break
                                         f.write(chunk)
                                         bytes_written += len(chunk)
-                            # Update session metadata
                             with contextlib.suppress(Exception):
                                 self._update_metadata(
                                     session_dir,
@@ -184,10 +181,8 @@ class FileTransferServer:
                                     header.device_id,
                                 )
                     except Exception:
-                        # ignore per-connection errors to keep server alive
                         continue
         except Exception:
-            # fatal socket error; exit thread
             return
 
     def _read_line(self, conn: socket.socket) -> str | None:
@@ -203,7 +198,7 @@ class FileTransferServer:
                 break
             if b != b"\r":
                 buf += b
-            if len(buf) > 1024 * 1024:  # 1MB header guard
+            if len(buf) > 1024 * 1024:
                 return None
         if not buf:
             return None

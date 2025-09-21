@@ -31,7 +31,6 @@ class ShimmerRecorderTest {
     @Test
     fun recorder_initializes_with_correct_defaults() {
         val recorder = ShimmerRecorder(mockContext)
-        // Test that the recorder can be created without exceptions
         assertThat(recorder).isNotNull()
     }
 
@@ -42,14 +41,12 @@ class ShimmerRecorderTest {
             try {
                 val recorder = ShimmerRecorder(mockContext)
 
-                // Multiple start/stop cycles should work
                 recorder.start(tmp)
                 recorder.stop()
 
                 recorder.start(tmp)
                 recorder.stop()
 
-                // Should not throw exceptions
                 assertThat(File(tmp, "gsr_data.csv").exists()).isTrue()
             } finally {
                 tmp.deleteRecursively()

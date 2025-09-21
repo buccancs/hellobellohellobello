@@ -10,13 +10,11 @@ class TestErrorMessageTranslator:
 
     def test_common_error_translations(self):
         """Test translation of common technical errors."""
-        # Test network errors
         conn_error = ConnectionRefusedError("Connection refused")
         user_msg = ErrorMessageTranslator.translate_error(conn_error)
         assert "unable to connect" in user_msg.lower()
         assert "same WiFi network" in user_msg
 
-        # Test file errors
         file_error = FileNotFoundError("File not found")
         user_msg = ErrorMessageTranslator.translate_error(file_error)
         assert "could not be found" in user_msg
@@ -70,7 +68,6 @@ class TestStatusIndicator:
 
     def test_device_status_formatting(self):
         """Test device status formatting."""
-        # Test connected device with good status
         status = StatusIndicator.format_device_status(
             "Device1", "connected", {"battery": 80, "signal_strength": 95}
         )
@@ -85,7 +82,6 @@ class TestStatusIndicator:
         )
         assert "Battery: 15% ⚠️" in status
 
-        # Test disconnected device
         status = StatusIndicator.format_device_status(
             "Device3", "disconnected", {}
         )
@@ -100,7 +96,6 @@ class TestUserExperienceIntegration:
         """Test error logging with user-friendly messages."""
         import logging
 
-        # Create a test logger
         logger = logging.getLogger("test_ux")
 
         error = FileNotFoundError("test.txt not found")
@@ -108,7 +103,7 @@ class TestUserExperienceIntegration:
 
         assert "could not be found" in user_msg
         assert isinstance(user_msg, str)
-        assert len(user_msg) > 20  # Should be a substantial message
+        assert len(user_msg) > 20
 
     def test_quick_access_functions(self):
         """Test quick access convenience functions."""
@@ -118,16 +113,13 @@ class TestUserExperienceIntegration:
             show_user_friendly_error,
         )
 
-        # Test quick error function
         error = ConnectionRefusedError("test error")
         msg = show_user_friendly_error(error)
         assert "unable to connect" in msg.lower()
 
-        # Test quick file location function
         location = show_file_location("/test/path", "Test data")
         assert "Test data location:" in location
 
-        # Test quick export status function
         status = show_export_status("/output", 3, ["HDF5"])
         assert "3 files exported" in status
         assert "HDF5" in status

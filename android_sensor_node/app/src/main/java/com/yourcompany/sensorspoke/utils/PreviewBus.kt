@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicReference
 object PreviewBus {
     private val listeners = CopyOnWriteArrayList<(bytes: ByteArray, timestampNs: Long) -> Unit>()
 
-    // Enhanced: Store current frame for retrieval and testing
     private val currentFrameRef = AtomicReference<ByteArray?>()
     private val currentTimestampRef = AtomicReference<Long?>(null)
 
@@ -29,7 +28,6 @@ object PreviewBus {
         bytes: ByteArray,
         timestampNs: Long,
     ) {
-        // Store current frame for retrieval
         currentFrameRef.set(bytes)
         currentTimestampRef.set(timestampNs)
 

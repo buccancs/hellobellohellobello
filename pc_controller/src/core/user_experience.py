@@ -7,9 +7,7 @@ from typing import ClassVar
 class ErrorMessageTranslator:
     """Translates technical errors into user-friendly messages with actionable advice."""
 
-    # Mapping of technical errors to user-friendly messages
     ERROR_TRANSLATIONS: ClassVar[dict[str, str]] = {
-        # Network errors
         "ConnectionRefusedError": "Unable to connect to device. Please check that the device is "
         "on the same WiFi network and try again.",
         "TimeoutError": "Connection timed out. Please check your network connection and ensure "
@@ -18,7 +16,6 @@ class ErrorMessageTranslator:
         "or lost network connectivity.",
         "NetworkUnreachableError": "Network is unreachable. Please check your WiFi connection "
         "and try again.",
-        # File system errors
         "FileNotFoundError": "Required file could not be found. Please check that all files "
         "are in the correct location.",
         "PermissionError": "Permission denied. Please check file permissions or run as "
@@ -26,14 +23,12 @@ class ErrorMessageTranslator:
         "DiskSpaceError": "Insufficient disk space. Please free up storage space and try again.",
         "FileExistsError": "A file with this name already exists. Please choose a different "
         "name or location.",
-        # Device errors
         "DeviceNotFoundError": "Device not detected. Please ensure the device is connected "
         "and powered on.",
         "DeviceBusyError": "Device is currently busy or being used by another application. "
         "Please close other applications and try again.",
         "DeviceDisconnectedError": "Device was disconnected during operation. Please reconnect "
         "the device and try again.",
-        # Calibration errors
         "CalibrationError": (
             "Camera calibration failed. Please ensure:\n"
             "• Checkerboard pattern is clearly visible\n"
@@ -49,7 +44,6 @@ class ErrorMessageTranslator:
             "Not enough calibration images. "
             "Please capture at least 10 clear images from different angles."
         ),
-        # Recording errors
         "RecordingError": (
             "Recording failed to start. "
             "Please check device connections and available storage space."
@@ -62,7 +56,6 @@ class ErrorMessageTranslator:
             "Device synchronization failed. "
             "Please ensure all devices are connected to the same network."
         ),
-        # Export/Import errors
         "ExportError": (
             "Data export failed. Please check that the destination folder "
             "has write permissions and sufficient space."
@@ -80,7 +73,6 @@ class ErrorMessageTranslator:
         "SettingsError": "Unable to save settings. Please check file permissions and try again.",
     }
 
-    # Context-specific advice for common error scenarios
     CONTEXT_ADVICE: ClassVar[dict[str, dict[str, str]]] = {
         "network": {
             "troubleshooting": (
@@ -145,7 +137,6 @@ class ErrorMessageTranslator:
             error_type, f"An unexpected error occurred: {error!s}"
         )
 
-        # Add context-specific advice if available
         if context and context in cls.CONTEXT_ADVICE:
             advice = cls.CONTEXT_ADVICE[context].get("troubleshooting", "")
             if advice:
@@ -187,15 +178,12 @@ class ErrorMessageTranslator:
         if logger is None:
             logger = logging.getLogger(__name__)
 
-        # Log technical details for developers
         logger.error(
             f"Technical error: {type(error).__name__}: {error!s}", exc_info=True
         )
 
-        # Get user-friendly message
         user_message = cls.translate_error(error, context)
 
-        # Log user-friendly message
         logger.info(f"User message: {user_message}")
 
         return user_message
@@ -218,10 +206,8 @@ class StatusIndicator:
         """
         import os
 
-        # Get absolute path for clarity
         abs_path = os.path.abspath(path)
 
-        # Create user-friendly message
         return f"{description} location: {abs_path}"
 
     @staticmethod
@@ -269,7 +255,6 @@ class StatusIndicator:
         symbol = status_symbols.get(status.lower(), "⚪")
         base_status = f"{symbol} {device_name}: {status.title()}"
 
-        # Add relevant details
         detail_parts = []
         if "battery" in details:
             battery = details["battery"]
@@ -291,7 +276,6 @@ class StatusIndicator:
         return base_status
 
 
-# Quick access functions for common use cases
 def show_user_friendly_error(error: Exception, context: str | None = None) -> str:
     """Quick function to get user-friendly error message."""
     return ErrorMessageTranslator.translate_error(error, context)

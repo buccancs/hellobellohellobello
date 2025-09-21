@@ -35,7 +35,6 @@ class NetworkClient(
     private var nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     private var registrationListener: NsdManager.RegistrationListener? = null
 
-    // Connection state
     private val socket = AtomicReference<Socket?>()
     private val isConnected = AtomicBoolean(false)
     private val serverAddress = AtomicReference<InetSocketAddress?>()
@@ -47,11 +46,9 @@ class NetworkClient(
     private val maxReconnectAttempts: Int = 5
     private val reconnectDelayMs: Long = 2000L
 
-    // Connection health monitoring
     private var lastSuccessfulMessage: Long = 0
-    private val healthCheckIntervalMs: Long = 30000L // 30 seconds
+    private val healthCheckIntervalMs: Long = 30000L
 
-    // Handler for retry scheduling
     private val mainHandler = Handler(Looper.getMainLooper())
     private var retryRunnable: Runnable? = null
 
@@ -65,7 +62,6 @@ class NetworkClient(
     ) {
         val sanitizedType = if (type.endsWith(".local.")) type else "$type.local."
         val info = NsdServiceInfo()
-        // Use explicit Java-style setters to avoid Kotlin property mutability issues
         info.serviceType = sanitizedType
         info.serviceName = name
         info.port = port
@@ -120,7 +116,7 @@ class NetworkClient(
         port: Int,
     ): Boolean =
         try {
-            disconnect() // Close any existing connection
+            disconnect()
 
             val newSocket = Socket()
             val address = InetSocketAddress(host, port)
@@ -132,7 +128,7 @@ class NetworkClient(
             socket.set(newSocket)
             serverAddress.set(address)
             isConnected.set(true)
-            reconnectAttempts = 0 // Reset on successful connection
+            reconnectAttempts = 0
             lastSuccessfulMessage = System.currentTimeMillis()
 
             Log.i(TAG, "Successfully connected to $host:$port")
@@ -144,13 +140,11 @@ class NetworkClient(
             // Auto-retry if enabled and under max attempts
             if (autoReconnect && reconnectAttempts < maxReconnectAttempts) {
                 reconnectAttempts++
-                val delayMs = reconnectDelayMs * reconnectAttempts // Exponential backoff
+                val delayMs = reconnectDelayMs * reconnectAttempts
                 Log.i(TAG, "Scheduling reconnection attempt $reconnectAttempts/$maxReconnectAttempts in ${delayMs}ms...")
 
-                // Cancel any existing retry
                 retryRunnable?.let { mainHandler.removeCallbacks(it) }
 
-                // Schedule actual retry attempt
                 retryRunnable = Runnable {
                     GlobalScope.launch(Dispatchers.IO) {
                         Log.i(TAG, "Executing scheduled reconnection attempt to $host:$port")
@@ -198,7 +192,6 @@ class NetworkClient(
         if (currentTime - lastSuccessfulMessage > healthCheckIntervalMs) {
             Log.w(TAG, "Connection appears stale, attempting to send heartbeat...")
 
-            // Try to send a simple heartbeat message using safe JSON construction
             val heartbeatJson = try {
                 JSONObject()
                     .put("type", "heartbeat")
@@ -229,14 +222,11 @@ class NetworkClient(
         if (address != null && reconnectAttempts < maxReconnectAttempts && autoReconnect) {
             Log.i(TAG, "Attempting to reconnect to ${address.hostString}:${address.port}")
 
-            // Use the same retry logic as the main connect method
             val delayMs = reconnectDelayMs * (reconnectAttempts + 1)
             reconnectAttempts++
 
-            // Cancel any existing retry
             retryRunnable?.let { mainHandler.removeCallbacks(it) }
 
-            // Schedule reconnection attempt
             retryRunnable = Runnable {
                 Log.i(TAG, "Executing scheduled reconnection to ${address.hostString}:${address.port}")
                 val success = try {
@@ -246,7 +236,7 @@ class NetworkClient(
 
                     socket.set(newSocket)
                     isConnected.set(true)
-                    reconnectAttempts = 0 // Reset on success
+                    reconnectAttempts = 0
                     lastSuccessfulMessage = System.currentTimeMillis()
 
                     Log.i(TAG, "Reconnection successful to ${address.hostString}:${address.port}")
@@ -256,7 +246,6 @@ class NetworkClient(
                     false
                 }
 
-                // If reconnection failed and we can still retry, schedule another attempt
                 if (!success && reconnectAttempts < maxReconnectAttempts && autoReconnect) {
                     attemptReconnection()
                 }
@@ -275,7 +264,6 @@ class NetworkClient(
     fun disconnect() {
         isConnected.set(false)
 
-        // Cancel any pending retry attempts
         retryRunnable?.let {
             mainHandler.removeCallbacks(it)
             retryRunnable = null
@@ -309,12 +297,10 @@ class NetworkClient(
             val outputStream: OutputStream = currentSocket.getOutputStream()
             val messageBytes = message.toByteArray(StandardCharsets.UTF_8)
 
-            // Send message with newline delimiter (line-based protocol)
             outputStream.write(messageBytes)
             outputStream.write('\n'.code)
             outputStream.flush()
 
-            // Update last successful message timestamp
             lastSuccessfulMessage = System.currentTimeMillis()
 
             Log.d(TAG, "Message sent successfully: ${message.take(100)}...")
@@ -407,25 +393,20 @@ class NetworkClient(
     fun cleanup() {
         Log.i(TAG, "Cleaning up NetworkClient resources...")
 
-        // Stop discovery
         stopDiscovery()
 
-        // Unregister service
         unregister()
 
-        // Cancel retry operations
         retryRunnable?.let {
             mainHandler.removeCallbacks(it)
             retryRunnable = null
         }
 
-        // Disconnect
         disconnect()
 
         Log.i(TAG, "NetworkClient cleanup completed")
     }
 
-    // PC Discovery functionality
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private var resolveListener: NsdManager.ResolveListener? = null
 
@@ -440,7 +421,7 @@ class NetworkClient(
         onDiscovered: (String, String, Int) -> Unit,
         onLost: (String) -> Unit,
     ) {
-        stopDiscovery() // Stop any existing discovery
+        stopDiscovery()
 
         val sanitizedType = if (serviceType.endsWith(".local.")) serviceType else "$serviceType.local."
 
@@ -471,7 +452,6 @@ class NetworkClient(
                 override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                     Log.d(TAG, "PC Hub service found: ${serviceInfo.serviceName}")
 
-                    // Resolve the service to get IP and port
                     resolveListener =
                         object : NsdManager.ResolveListener {
                             override fun onResolveFailed(
@@ -536,10 +516,8 @@ class NetworkClient(
             onDiscovered = { name, host, port ->
                 Log.i(TAG, "Attempting auto-connection to $name at $host:$port")
 
-                // Stop discovery once we find a service
                 stopDiscovery()
 
-                // Attempt connection
                 if (connect(host, port)) {
                     Log.i(TAG, "Auto-connection successful to $name")
                     onConnected(name, host, port)
@@ -553,12 +531,11 @@ class NetworkClient(
             },
         )
 
-        // Set a timeout for discovery
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             if (discoveryListener != null && !isConnected()) {
                 stopDiscovery()
                 onFailed("No PC Hub found on network within timeout")
             }
-        }, 10000) // 10 second timeout
+        }, 10000)
     }
 }

@@ -11,7 +11,6 @@ try:
     from .native_backend import NativeShimmer, NativeWebcam, __version__, shimmer_capi_enabled  # type: ignore[attr-defined]
     __all__ = ["NativeShimmer", "NativeWebcam", "__version__", "shimmer_capi_enabled"]
 except Exception as exc:  # pragma: no cover - optional
-    # Keep explicit error to help developers build the extension
     raise ImportError(
         "native_backend extension not found. Build it with CMake and place the compiled "
         "artifact (native_backend.pyd/.so) into this directory."

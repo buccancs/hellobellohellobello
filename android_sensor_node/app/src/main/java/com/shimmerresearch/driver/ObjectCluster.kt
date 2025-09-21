@@ -8,11 +8,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Stores sensor data in multiple formats (RAW, CAL) with metadata.
  */
 class ObjectCluster {
-    // State information
     var mState: ShimmerBluetooth.BtState = ShimmerBluetooth.BtState.DISCONNECTED
     private var mBluetoothAddress: String = ""
 
-    // Data storage: sensorName -> formatType -> FormatCluster
     private val mDataMap = ConcurrentHashMap<String, ConcurrentHashMap<String, FormatCluster>>()
 
     /**
@@ -100,7 +98,7 @@ class ObjectCluster {
  * FormatCluster contains sensor data in specific format
  */
 data class FormatCluster(
-    val mChannelType: String, // e.g., "CAL", "RAW", "UNCAL"
-    val mUnits: String, // e.g., "µS", "mS", "no units"
-    val mData: Double, // The actual sensor value
+    val mChannelType: String,
+    val mUnits: String,
+    val mData: Double,
 )

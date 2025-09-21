@@ -28,7 +28,7 @@ class HeartbeatManagerTest {
                 context = context,
                 deviceId = "test_device",
                 networkClient = mockNetworkClient,
-                heartbeatIntervalMs = 100L, // Fast for testing
+                heartbeatIntervalMs = 100L,
                 maxReconnectAttempts = 3,
                 reconnectBackoffMs = 50L,
             )

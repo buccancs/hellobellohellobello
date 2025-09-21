@@ -21,7 +21,7 @@ class ExecutionResult:
     """Represents the result of a test execution."""
     test_name: str
     category: str
-    status: str  # PASSED, FAILED, SKIPPED, ERROR
+    status: str
     duration_seconds: float
     error_message: str | None = None
 
@@ -98,14 +98,12 @@ class SuiteOrganizer:
             categorized[category] = []
 
             if category == "android":
-                # Handle Android tests separately
                 if self.android_tests_dir.exists():
                     for pattern in config["patterns"]:
                         categorized[category].extend(
                             self.android_tests_dir.rglob(pattern)
                         )
             else:
-                # Handle Python tests
                 if self.pc_tests_dir.exists():
                     for test_file in self.pc_tests_dir.glob("*.py"):
                         if self._matches_category(test_file, config):
@@ -117,13 +115,11 @@ class SuiteOrganizer:
         """Check if a test file matches a category configuration."""
         file_name = test_file.name.lower()
 
-        # Check include patterns
         include_match = any(
             any(pattern_part in file_name for pattern_part in pattern.replace("*", "").split("."))
             for pattern in config["patterns"]
         )
 
-        # Check exclude patterns
         exclude_match = any(
             exclude_pattern.lower() in file_name
             for exclude_pattern in config["exclude_patterns"]
@@ -162,18 +158,14 @@ class SuiteExecutor:
         if not test_files:
             return []
 
-        # Build pytest command
         cmd = ["python", "-m", "pytest", "-v", "--tb=short"]
 
-        # Add marker filters
         if markers:
             marker_expr = " and ".join(markers)
             cmd.extend(["-m", marker_expr])
 
-        # Add test files
         cmd.extend([str(f) for f in test_files])
 
-        # Execute tests
         start_time = time.time()
 
         try:
@@ -182,12 +174,11 @@ class SuiteExecutor:
                 cwd=self.test_root,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout
+                timeout=300
             )
 
             duration = time.time() - start_time
 
-            # Parse results (simplified - real implementation would parse pytest output)
             test_results = self._parse_pytest_output(result.stdout, category, duration)
 
         except subprocess.TimeoutExpired:
@@ -232,7 +223,6 @@ class SuiteExecutor:
                 )
             ]
 
-        # Execute Android tests
         start_time = time.time()
 
         try:
@@ -241,12 +231,11 @@ class SuiteExecutor:
                 cwd=android_root,
                 capture_output=True,
                 text=True,
-                timeout=600  # 10 minute timeout for Android build
+                timeout=600
             )
 
             duration = time.time() - start_time
 
-            # Parse Android test results (simplified)
             test_results = self._parse_android_output(result.stdout, duration)
 
         except subprocess.TimeoutExpired:
@@ -281,11 +270,9 @@ class SuiteExecutor:
         results = []
         lines = output.split('\n')
 
-        # Simple parsing - look for test results
         for line in lines:
             line = line.strip()
 
-            # Look for test result lines
             if '::test_' in line and ('PASSED' in line or 'FAILED' in line or 'SKIPPED' in line):
                 parts = line.split(' ')
                 test_name = parts[0] if parts else f"unknown_test_{len(results)}"
@@ -299,7 +286,6 @@ class SuiteExecutor:
                 else:
                     status = 'ERROR'
 
-                # Extract duration if available
                 duration = 0.0
                 for part in parts:
                     if part.endswith('s') and part[:-1].replace('.', '').isdigit():
@@ -313,7 +299,6 @@ class SuiteExecutor:
                     duration_seconds=duration
                 ))
 
-        # If no individual results found, create summary result
         if not results:
             if 'failed' in output.lower():
                 status = 'FAILED'
@@ -333,7 +318,6 @@ class SuiteExecutor:
 
     def _parse_android_output(self, output: str, total_duration: float) -> list[ExecutionResult]:
         """Parse Android test output to extract results."""
-        # Simplified Android test result parsing
         if "BUILD SUCCESSFUL" in output:
             status = "PASSED"
             error_msg = None
@@ -361,10 +345,8 @@ class SuiteExecutor:
         start_time = time.time()
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Get execution plan
         execution_plan = self.organizer.get_test_execution_plan(categories)
 
-        # Execute tests by category
         all_results = []
         category_stats = {}
 
@@ -379,7 +361,6 @@ class SuiteExecutor:
 
             all_results.extend(results)
 
-            # Calculate category statistics
             category_stats[category] = {
                 "total": len(results),
                 "passed": len([r for r in results if r.status == "PASSED"]),
@@ -388,7 +369,6 @@ class SuiteExecutor:
                 "errors": len([r for r in results if r.status == "ERROR"]),
             }
 
-        # Generate comprehensive report
         total_duration = time.time() - start_time
 
         report = SuiteExecutionReport(
@@ -403,7 +383,6 @@ class SuiteExecutor:
             test_results=all_results
         )
 
-        # Save report if requested
         if output_file:
             self._save_report(report, output_file)
 
@@ -428,7 +407,6 @@ class CoverageAnalyzer:
     def analyze_python_coverage(self) -> dict[str, Any]:
         """Analyze Python test coverage."""
         try:
-            # Run coverage analysis
             subprocess.run(
                 ["python", "-m", "pytest", "--cov=pc_controller/src", "--cov-report=json"],
                 cwd=self.test_root,
@@ -437,7 +415,6 @@ class CoverageAnalyzer:
                 timeout=300
             )
 
-            # Parse coverage report
             coverage_file = self.test_root / "coverage.json"
             if coverage_file.exists():
                 with open(coverage_file) as f:
@@ -518,17 +495,14 @@ def main():
 
     args = parser.parse_args()
 
-    # Initialize executor
     executor = SuiteExecutor(args.test_root)
 
-    # Execute tests
     print("Starting comprehensive test suite execution...")
     report = executor.execute_comprehensive_suite(
         categories=args.categories,
         output_file=args.output
     )
 
-    # Print summary
     print("\n" + "="*50)
     print("TEST EXECUTION SUMMARY")
     print("="*50)
@@ -540,12 +514,10 @@ def main():
     print(f"Duration: {report.duration_seconds:.1f}s")
     print(f"Success Rate: {(report.passed / report.total_tests * 100):.1f}%")
 
-    # Category breakdown
     print("\nCATEGORY BREAKDOWN:")
     for category, stats in report.categories.items():
         print(f"  {category.capitalize()}: {stats['passed']}/{stats['total']} passed")
 
-    # Coverage analysis
     if args.coverage:
         print("\nCOVERAGE ANALYSIS:")
         analyzer = CoverageAnalyzer(args.test_root)
@@ -558,7 +530,6 @@ def main():
         for rec in coverage_report["recommendations"]:
             print(f"  - {rec}")
 
-    # Exit with appropriate code
     exit_code = 0 if report.failed == 0 and report.errors == 0 else 1
     print(f"\nTest execution completed with exit code {exit_code}")
     exit(exit_code)

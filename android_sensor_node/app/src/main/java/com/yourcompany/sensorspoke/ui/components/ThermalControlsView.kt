@@ -11,7 +11,7 @@ import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.widget.SwitchCompat
-// R import handled automatically
+import com.yourcompany.sensorspoke.R
 import com.yourcompany.sensorspoke.sensors.thermal.TopdonThermalPalette
 import java.util.Locale
 
@@ -27,7 +27,6 @@ constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
 ) : LinearLayout(context, attrs, defStyleAttr) {
-    // UI Components (fallback to LinearLayout-based implementation)
     private val paletteSpinner: Spinner
     private val emissivitySlider: SeekBar
     private val emissivityValue: TextView
@@ -40,7 +39,6 @@ constructor(
     private val deviceStatusIndicator: View
     private val deviceStatusText: TextView
 
-    // Callback interfaces
     var onPaletteChanged: ((TopdonThermalPalette) -> Unit)? = null
     var onEmissivityChanged: ((Float) -> Unit)? = null
     var onTemperatureRangeChanged: ((Float, Float) -> Unit)? = null
@@ -51,7 +49,6 @@ constructor(
         orientation = VERTICAL
         setPadding(16, 16, 16, 16)
 
-        // Create UI components programmatically for simplicity
         deviceStatusText =
             TextView(context).apply {
                 text = "Device Status: Disconnected"
@@ -70,7 +67,6 @@ constructor(
             }
         addView(deviceStatusIndicator)
 
-        // Thermal Palette
         addView(
             TextView(context).apply {
                 text = "Thermal Palette:"
@@ -88,7 +84,6 @@ constructor(
             }
         addView(paletteSpinner)
 
-        // Emissivity Control
         addView(
             TextView(context).apply {
                 text = "Emissivity:"
@@ -111,7 +106,6 @@ constructor(
             }
         addView(emissivitySlider)
 
-        // Temperature Range
         addView(
             TextView(context).apply {
                 text = "Min Temperature (°C):"
@@ -150,7 +144,6 @@ constructor(
             }
         addView(tempRangeDisplay)
 
-        // Auto Gain Control
         autoGainToggle =
             SwitchCompat(context).apply {
                 text = "Auto Gain Control"
@@ -158,7 +151,6 @@ constructor(
             }
         addView(autoGainToggle)
 
-        // Temperature Compensation
         temperatureCompensationToggle =
             SwitchCompat(context).apply {
                 text = "Temperature Compensation"
@@ -166,7 +158,6 @@ constructor(
             }
         addView(temperatureCompensationToggle)
 
-        // Current Temperature Display
         currentTempDisplay =
             TextView(context).apply {
                 text = "Current: N/A"
@@ -180,7 +171,6 @@ constructor(
     }
 
     private fun setupControls() {
-        // Palette spinner
         paletteSpinner.onItemSelectedListener =
             object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(
@@ -202,7 +192,6 @@ constructor(
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
             }
 
-        // Emissivity slider
         emissivitySlider.setOnSeekBarChangeListener(
             object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(
@@ -223,7 +212,6 @@ constructor(
             },
         )
 
-        // Temperature inputs
         minTempInput.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) updateTemperatureRange()
         }
@@ -231,7 +219,6 @@ constructor(
             if (!hasFocus) updateTemperatureRange()
         }
 
-        // Toggle switches
         autoGainToggle.setOnCheckedChangeListener { _, isChecked ->
             onAutoGainToggled?.invoke(isChecked)
         }
@@ -250,7 +237,6 @@ constructor(
                 tempRangeDisplay.text = "${String.format(java.util.Locale.ROOT, "%.1f", minTemp)}°C - ${String.format(java.util.Locale.ROOT, "%.1f", maxTemp)}°C"
             }
         } catch (e: Exception) {
-            // Handle silently
         }
     }
 

@@ -10,7 +10,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-// R import handled automatically
+import com.yourcompany.sensorspoke.R
 import com.yourcompany.sensorspoke.ui.adapters.SessionAdapter
 import com.yourcompany.sensorspoke.ui.models.SessionInfo
 import java.io.File
@@ -96,7 +96,6 @@ class FileManagerFragment : Fragment() {
                 sessionList.add(sessionInfo)
             }
 
-            // Sort by date (newest first)
             sessionList.sortByDescending { it.dateTime }
 
             sessionAdapter?.notifyDataSetChanged()
@@ -111,7 +110,6 @@ class FileManagerFragment : Fragment() {
         val dateTime = getSessionDateTime(sessionName)
         val size = calculateDirectorySize(sessionDir)
 
-        // Count files
         val allFiles = sessionDir.walkTopDown().filter { it.isFile }.toList()
         val videoFiles = allFiles.count { it.name.endsWith(".mp4") }
         val csvFiles = allFiles.count { it.name.endsWith(".csv") }
@@ -135,7 +133,6 @@ class FileManagerFragment : Fragment() {
     }
 
     private fun getSessionDateTime(sessionName: String): Date {
-        // Extract datetime from session name format: session_YYYYMMDD_HHMMSS
         val pattern = """session_(\d{8})_(\d{6})""".toRegex()
         val matchResult = pattern.find(sessionName)
 
@@ -145,7 +142,7 @@ class FileManagerFragment : Fragment() {
             val format = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
             format.parse(dateTimeStr) ?: Date()
         } else {
-            Date() // Fallback to current time
+            Date()
         }
     }
 
@@ -169,7 +166,6 @@ class FileManagerFragment : Fragment() {
     }
 
     private fun onSessionClicked(session: SessionInfo) {
-        // Show session details or navigate to details view
         Toast
             .makeText(
                 requireContext(),
@@ -197,7 +193,7 @@ class FileManagerFragment : Fragment() {
             val totalBytes = statsFs.totalBytes
             val usagePercent = ((totalBytes - availableBytes).toFloat() / totalBytes * 100f).toInt()
 
-            val shouldCleanupBySize = usagePercent > 80 // If storage > 80% full
+            val shouldCleanupBySize = usagePercent > 80
             val sizeMB = sessionList.sumOf { it.sizeBytes } / (1024 * 1024)
 
             android.util.Log.i("FileManager", "Cleanup analysis - Storage: $usagePercent% used, Sessions: ${sessionList.size} (${sizeMB}MB), Old sessions: ${oldSessions.size}")
@@ -213,7 +209,6 @@ class FileManagerFragment : Fragment() {
 
             val sessionsToDelete = mutableListOf<SessionInfo>()
 
-            // Add old sessions
             sessionsToDelete.addAll(oldSessions)
 
             // If storage is still critical, add more sessions starting with largest/oldest
@@ -223,8 +218,7 @@ class FileManagerFragment : Fragment() {
                     compareBy<SessionInfo> { it.dateTime }.thenByDescending { it.sizeBytes },
                 )
 
-                // Add more sessions until we have reasonable cleanup target
-                val maxAdditionalSessions = (sessionList.size * 0.3).toInt() // Clean up to 30% more if needed
+                val maxAdditionalSessions = (sessionList.size * 0.3).toInt()
                 sessionsToDelete.addAll(sortedByAgeAndSize.take(maxAdditionalSessions))
             }
 
@@ -235,7 +229,6 @@ class FileManagerFragment : Fragment() {
 
             val totalSizeToDeleteMB = sessionsToDelete.sumOf { it.sizeBytes } / (1024 * 1024)
 
-            // Show confirmation dialog with detailed info
             val confirmMessage = buildString {
                 append("Cleanup ${sessionsToDelete.size} sessions?\n\n")
                 append("• Age-based: ${oldSessions.size} sessions older than $defaultCleanupDays days\n")
@@ -294,7 +287,6 @@ class FileManagerFragment : Fragment() {
 
             Toast.makeText(requireContext(), resultMessage, Toast.LENGTH_LONG).show()
 
-            // Refresh the session list
             loadSessions()
         } catch (e: Exception) {
             android.util.Log.e("FileManager", "Error during cleanup: ${e.message}", e)

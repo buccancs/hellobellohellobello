@@ -37,13 +37,11 @@ class TestHeartbeatStatus:
         """Test that marking missed heartbeats updates counters."""
         status = HeartbeatStatus(device_id="test", last_heartbeat_ns=0)
 
-        # First two misses should not mark as unhealthy
         status.mark_missed()
         status.mark_missed()
         assert status.consecutive_misses == 2
         assert status.is_healthy is True
 
-        # Third miss should mark as unhealthy
         status.mark_missed()
         assert status.consecutive_misses == 3
         assert status.is_healthy is False
@@ -56,7 +54,7 @@ class TestHeartbeatManager:
         """Test HeartbeatManager initializes with correct defaults."""
         manager = HeartbeatManager()
         assert manager.heartbeat_interval_s == 3.0
-        assert manager.timeout_ns == 9_000_000_000  # 3 * 3 * 1e9
+        assert manager.timeout_ns == 9_000_000_000
         assert manager.max_reconnect_attempts == 10
         assert len(manager._devices) == 0
 
@@ -106,11 +104,9 @@ class TestHeartbeatManager:
         manager.register_device("device1")
         manager.set_device_online_callback("device1", online_callback)
 
-        # Mark device as unhealthy
         status = manager.get_device_status("device1")
         status.is_healthy = False
 
-        # Record heartbeat should trigger online callback
         manager.record_heartbeat("device1")
         assert callback_called
 
@@ -121,7 +117,6 @@ class TestHeartbeatManager:
         manager.register_device("healthy2")
         manager.register_device("unhealthy1")
 
-        # Mark one device as unhealthy
         manager._devices["unhealthy1"].is_healthy = False
 
         healthy = manager.get_healthy_devices()
@@ -133,7 +128,7 @@ class TestHeartbeatManager:
     @pytest.mark.asyncio
     async def test_start_stop_monitoring(self):
         """Test starting and stopping the monitoring loop."""
-        manager = HeartbeatManager(heartbeat_interval_s=0.1)  # Fast for testing
+        manager = HeartbeatManager(heartbeat_interval_s=0.1)
 
         assert not manager._running
 
@@ -157,35 +152,31 @@ class TestHeartbeatManager:
 
         manager.set_device_offline_callback("test_device", offline_callback)
 
-        # Set heartbeat time to past to simulate timeout - register device at specific time
-        with patch('time.time_ns', return_value=1000000000):  # 1 second
+        with patch('time.time_ns', return_value=1000000000):
             manager.register_device("test_device")
 
-        # Check heartbeats after timeout period
-        with patch('time.time_ns', return_value=1300000000):  # 1.3 seconds later
+        with patch('time.time_ns', return_value=1300000000):
             await manager._check_heartbeats()
 
         status = manager.get_device_status("test_device")
         assert status.consecutive_misses == 1
-        assert status.is_healthy  # Still healthy after just 1 miss
-        assert not offline_callback_called  # Callback not triggered yet
+        assert status.is_healthy
+        assert not offline_callback_called
 
-        # Check heartbeats again to accumulate more misses
-        with patch('time.time_ns', return_value=1600000000):  # 1.6 seconds later
+        with patch('time.time_ns', return_value=1600000000):
             await manager._check_heartbeats()
 
         status = manager.get_device_status("test_device")
         assert status.consecutive_misses == 2
-        assert status.is_healthy  # Still healthy after 2 misses
+        assert status.is_healthy
 
-        # Third miss should trigger offline status
-        with patch('time.time_ns', return_value=1900000000):  # 1.9 seconds later
+        with patch('time.time_ns', return_value=1900000000):
             await manager._check_heartbeats()
 
         status = manager.get_device_status("test_device")
         assert status.consecutive_misses == 3
-        assert not status.is_healthy  # Now unhealthy after 3 misses
-        assert offline_callback_called  # Callback triggered
+        assert not status.is_healthy
+        assert offline_callback_called
 
     @pytest.mark.asyncio
     async def test_check_heartbeats_triggers_reconnect(self):
@@ -205,16 +196,14 @@ class TestHeartbeatManager:
         manager.register_device("test_device")
         manager.set_reconnect_callback("test_device", reconnect_callback)
 
-        # Set up initial state - device offline for sufficient time
         status = manager.get_device_status("test_device")
-        with patch('time.time_ns', return_value=1000000000):  # 1 second ago
-            status.last_heartbeat_ns = 800000000  # 0.8 seconds
+        with patch('time.time_ns', return_value=1000000000):
+            status.last_heartbeat_ns = 800000000
             status.is_healthy = False
             status.consecutive_misses = 5
-            status.last_reconnect_attempt_ns = 900000000  # 0.9 seconds
+            status.last_reconnect_attempt_ns = 900000000
 
-        # Check heartbeats - should trigger reconnect
-        with patch('time.time_ns', return_value=1200000000):  # 1.2 seconds
+        with patch('time.time_ns', return_value=1200000000):
             await manager._check_heartbeats()
 
         assert reconnect_callback_called
@@ -251,12 +240,10 @@ class TestHeartbeatManager:
         assert parsed["device_id"] == "device1"
         assert parsed["metadata"]["battery"] == 85
 
-        # Test invalid message
         invalid_message = json.dumps({"type": "other", "device_id": "device1"})
         parsed = manager.parse_heartbeat_message(invalid_message)
         assert parsed is None
 
-        # Test malformed JSON
         parsed = manager.parse_heartbeat_message("invalid json")
         assert parsed is None
 
@@ -266,7 +253,6 @@ class TestHeartbeatManager:
         manager.register_device("device1")
         manager.register_device("device2")
 
-        # Make one device unhealthy
         manager._devices["device2"].is_healthy = False
         manager._devices["device2"].consecutive_misses = 3
 
@@ -277,7 +263,6 @@ class TestHeartbeatManager:
         assert "device2" in summary["unhealthy_devices"]
         assert summary["heartbeat_interval_s"] == 3.0
 
-        # Check device details
         assert "device1" in summary["device_details"]
         assert "device2" in summary["device_details"]
         assert summary["device_details"]["device2"]["consecutive_misses"] == 3
@@ -290,14 +275,12 @@ class TestHeartbeatIntegration:
     @pytest.mark.asyncio
     async def test_full_heartbeat_cycle(self):
         """Test a complete heartbeat monitoring cycle."""
-        # Use very short intervals for fast testing
         manager = HeartbeatManager(
             heartbeat_interval_s=0.01,
-            timeout_multiplier=2,  # 0.02s timeout
+            timeout_multiplier=2,
             reconnect_backoff_s=0.01
         )
 
-        # Track callback invocations
         events = []
 
         def offline_callback(device_id):
@@ -309,32 +292,25 @@ class TestHeartbeatIntegration:
         def reconnect_callback(device_id):
             events.append(f"reconnect:{device_id}")
 
-        # Register device with callbacks at a specific time
-        start_time = 1000000000  # 1 second in nanoseconds
+        start_time = 1000000000
         with patch('time.time_ns', return_value=start_time):
             manager.register_device("test_device")
             manager.set_device_offline_callback("test_device", offline_callback)
             manager.set_device_online_callback("test_device", online_callback)
             manager.set_reconnect_callback("test_device", reconnect_callback)
 
-        # Start monitoring
         await manager.start_monitoring()
 
-        # Wait for multiple check cycles to ensure device goes offline
-        # Need at least 3 misses for unhealthy status
-        await asyncio.sleep(0.08)  # 8x the check interval
+        await asyncio.sleep(0.08)
 
-        # Device should be marked offline due to no recent heartbeats
         unhealthy_devices = manager.get_unhealthy_devices()
         assert "test_device" in unhealthy_devices, (
             f"Expected test_device in {unhealthy_devices}, events: {events}"
         )
         assert "offline:test_device" in events, f"Expected offline event in {events}"
 
-        # Send a heartbeat to restore connection
         manager.record_heartbeat("test_device")
 
-        # Device should be back online
         healthy_devices = manager.get_healthy_devices()
         assert "test_device" in healthy_devices, f"Expected test_device in {healthy_devices}"
         assert "online:test_device" in events, f"Expected online event in {events}"
@@ -345,18 +321,14 @@ class TestHeartbeatIntegration:
         """Test creating and parsing heartbeat messages."""
         manager = HeartbeatManager()
 
-        # Create message
         metadata = {"battery": 75, "recording": True}
         message = manager.create_heartbeat_message("device1", metadata)
 
-        # Parse message
         parsed = manager.parse_heartbeat_message(message)
         assert parsed is not None
 
-        # Use parsed data to record heartbeat
         manager.record_heartbeat(parsed["device_id"], parsed["metadata"])
 
-        # Verify device was registered and heartbeat recorded
         status = manager.get_device_status("device1")
         assert status is not None
         assert status.is_healthy

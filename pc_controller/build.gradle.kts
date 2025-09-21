@@ -58,15 +58,8 @@ val installRequirements by tasks.registering(Exec::class) {
     }
 }
 
-// Run pytest using the system Python (relies on environment pytest)
-val pyTest by tasks.registering(Exec::class) {
-    group = "verification"
-    description = "Run pytest for pc_controller"
-    // Do not depend on venv to avoid heavy installs in CI; pytest is executed from repo root
-    val pytestCmd = if (isWindows) "pytest" else "python3 -m pytest"
-    commandLine(shellCommand(pytestCmd))
-    workingDir = project.rootDir // pytest.ini is at repo root
-}
+// NOTE: pytest is run from root project level, not here, to use repo-level pytest.ini
+// The root build.gradle.kts has a pyTest task that runs from the repo root
 
 // Build a standalone executable using PyInstaller
 val pyInstaller by tasks.registering(Exec::class) {

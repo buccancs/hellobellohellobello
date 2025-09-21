@@ -24,7 +24,6 @@ class UserExperienceTest {
 
     @Test
     fun testNetworkErrorTranslation() {
-        // Test connection refused error
         val connectionRefusedError = "java.net.ConnectException: Connection refused"
         val translatedMessage = UserExperience.ErrorTranslator.translateNetworkError(connectionRefusedError, "network")
 
@@ -35,7 +34,6 @@ class UserExperienceTest {
 
     @Test
     fun testSensorErrorTranslation() {
-        // Test Shimmer GSR sensor error
         val gsrError = "Device not found"
         val translatedMessage = UserExperience.ErrorTranslator.translateSensorError("shimmer", gsrError)
 
@@ -46,7 +44,6 @@ class UserExperienceTest {
 
     @Test
     fun testThermalCameraErrorTranslation() {
-        // Test thermal camera USB error
         val thermalError = "USB device not accessible"
         val translatedMessage = UserExperience.ErrorTranslator.translateSensorError("thermal", thermalError)
 
@@ -57,7 +54,6 @@ class UserExperienceTest {
 
     @Test
     fun testRgbCameraErrorTranslation() {
-        // Test RGB camera permission error
         val cameraError = "Camera permission denied"
         val translatedMessage = UserExperience.ErrorTranslator.translateSensorError("rgb", cameraError)
 
@@ -68,38 +64,31 @@ class UserExperienceTest {
 
     @Test
     fun testConnectionStatusFormatting() {
-        // Test connected status
         val connectedStatus = UserExperience.StatusFormatter.formatConnectionStatus(true, "192.168.1.100:8080")
         assertEquals("Connected to PC Hub: 192.168.1.100:8080", connectedStatus)
 
-        // Test disconnected status
         val disconnectedStatus = UserExperience.StatusFormatter.formatConnectionStatus(false)
         assertEquals("Not connected to PC Hub", disconnectedStatus)
     }
 
     @Test
     fun testRecordingStatusFormatting() {
-        // Test recording status with session ID
         val recordingStatus = UserExperience.StatusFormatter.formatRecordingStatus(true, "session_123", 125)
         assertTrue("Should contain session ID", recordingStatus.contains("session_123"))
         assertTrue("Should show duration", recordingStatus.contains("2:05"))
 
-        // Test ready status
         val readyStatus = UserExperience.StatusFormatter.formatRecordingStatus(false)
         assertEquals("Ready to record", readyStatus)
     }
 
     @Test
     fun testSensorStatusFormatting() {
-        // Test connected sensor
         val connectedSensor = UserExperience.StatusFormatter.formatSensorStatus("Shimmer GSR", true, false)
         assertEquals("Shimmer GSR: Connected", connectedSensor)
 
-        // Test recording sensor
         val recordingSensor = UserExperience.StatusFormatter.formatSensorStatus("RGB Camera", true, true)
         assertEquals("RGB Camera: Recording", recordingSensor)
 
-        // Test disconnected sensor
         val disconnectedSensor = UserExperience.StatusFormatter.formatSensorStatus("Thermal Camera", false, false)
         assertEquals("Thermal Camera: Disconnected", disconnectedSensor)
     }
@@ -113,7 +102,7 @@ class UserExperienceTest {
 
     @Test
     fun testDataExportFormatting() {
-        val exportInfo = UserExperience.StatusFormatter.formatDataExportInfo("HDF5", 5, 52428800L) // 50MB
+        val exportInfo = UserExperience.StatusFormatter.formatDataExportInfo("HDF5", 5, 52428800L)
         assertTrue("Should contain file count", exportInfo.contains("5 files"))
         assertTrue("Should contain format", exportInfo.contains("HDF5"))
         assertTrue("Should contain size in MB", exportInfo.contains("50MB"))

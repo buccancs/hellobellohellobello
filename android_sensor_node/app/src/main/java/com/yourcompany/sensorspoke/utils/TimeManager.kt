@@ -48,14 +48,12 @@ object TimeManager {
                 socket.soTimeout = timeoutMillis
                 val addr = InetAddress.getByName(serverIp)
 
-                // Send minimal probe
                 val sendBuf = byteArrayOf(1)
                 val sendPkt = DatagramPacket(sendBuf, sendBuf.size, addr, serverPort)
 
                 val t1 = System.nanoTime()
                 socket.send(sendPkt)
 
-                // Receive server timestamp
                 val recvBuf = ByteArray(64)
                 val recvPkt = DatagramPacket(recvBuf, recvBuf.size)
                 socket.receive(recvPkt)

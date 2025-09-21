@@ -24,7 +24,6 @@ abstract class Shimmer(
     protected val handler: Handler,
 ) {
     companion object {
-        // Message identifiers from ShimmerAndroidAPI
         const val MSG_IDENTIFIER_DATA_PACKET = 0x10
         const val MSG_IDENTIFIER_STATE_CHANGE = 0x11
         const val MSG_IDENTIFIER_NOTIFICATION_MESSAGE = 0x12
@@ -32,14 +31,13 @@ abstract class Shimmer(
         const val MESSAGE_TOAST = 0x20
         const val TOAST = "toast"
 
-        // Notification messages
         const val NOTIFICATION_SHIMMER_FULLY_INITIALIZED = 0x01
         const val NOTIFICATION_SHIMMER_START_STREAMING = 0x02
         const val NOTIFICATION_SHIMMER_STOP_STREAMING = 0x03
 
         // Sensor bit flags (matching official API)
         const val SENSOR_GSR = 0x04
-        const val SENSOR_INT_A13 = 0x08 // PPG
+        const val SENSOR_INT_A13 = 0x08
         const val SENSOR_TIMESTAMP = 0x01
         const val SENSOR_ACCEL = 0x80
 
@@ -53,18 +51,16 @@ abstract class Shimmer(
         private const val TAG = "Shimmer"
     }
 
-    // Connection state
     protected var mIsConnected = false
     protected var mIsStreaming = false
     protected var mIsInitialized = false
     protected val mBluetoothAddress = bluetoothAddressParam
 
     // Configuration
-    protected var mSamplingRate = 128.0 // Default 128Hz
+    protected var mSamplingRate = 128.0
     protected var mEnabledSensors = 0L
     protected var mGSRRange = GSR_RANGE_4_7M
 
-    // Data handling
     protected val mCallbackObjects = ConcurrentHashMap<String, Any>()
     protected var mDataProcessingScope: CoroutineScope? = null
 

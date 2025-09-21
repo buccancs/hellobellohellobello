@@ -19,7 +19,6 @@ class DeviceConnectionManagerTest {
 
     @Before
     fun setUp() {
-        // Create manager without context for unit testing
         deviceManager = DeviceConnectionManager(null)
     }
 
@@ -30,7 +29,6 @@ class DeviceConnectionManagerTest {
 
     @Test
     fun testInitialState() {
-        // Test initial state without using coroutines
         assertEquals("Connected device count should be 0", 0, deviceManager.getConnectedDeviceCount())
         assertFalse("System should not be ready initially", deviceManager.isReadyForRecording())
     }
@@ -53,7 +51,6 @@ class DeviceConnectionManagerTest {
 
     @Test
     fun testMultipleDeviceConnections() {
-        // Connect multiple devices
         deviceManager.updateShimmerState(DeviceConnectionManager.DeviceState.CONNECTED)
         deviceManager.updateRgbCameraState(DeviceConnectionManager.DeviceState.CONNECTED)
         deviceManager.updateThermalCameraState(DeviceConnectionManager.DeviceState.CONNECTED)
@@ -64,7 +61,6 @@ class DeviceConnectionManagerTest {
 
     @Test
     fun testAllDevicesConnected() {
-        // Connect all devices
         deviceManager.updateShimmerState(DeviceConnectionManager.DeviceState.CONNECTED)
         deviceManager.updateRgbCameraState(DeviceConnectionManager.DeviceState.CONNECTED)
         deviceManager.updateThermalCameraState(DeviceConnectionManager.DeviceState.CONNECTED)
@@ -77,10 +73,8 @@ class DeviceConnectionManagerTest {
 
     @Test
     fun testPartiallyReadyState() {
-        // Connect some but not all devices
         deviceManager.updateShimmerState(DeviceConnectionManager.DeviceState.CONNECTED)
         deviceManager.updateRgbCameraState(DeviceConnectionManager.DeviceState.CONNECTED)
-        // Leave other devices disconnected
 
         assertEquals("Connected device count should be 2", 2, deviceManager.getConnectedDeviceCount())
         assertTrue("System should be ready for recording in partial state", deviceManager.isReadyForRecording())
@@ -114,11 +108,9 @@ class DeviceConnectionManagerTest {
 
     @Test
     fun testResetAllStates() {
-        // Connect some devices first
         deviceManager.updateShimmerState(DeviceConnectionManager.DeviceState.CONNECTED)
         deviceManager.updateRgbCameraState(DeviceConnectionManager.DeviceState.CONNECTED)
 
-        // Reset all states
         deviceManager.resetAllStates()
 
         assertEquals("Connected device count should be 0 after reset", 0, deviceManager.getConnectedDeviceCount())
@@ -127,11 +119,9 @@ class DeviceConnectionManagerTest {
 
     @Test
     fun testCleanup() {
-        // Connect some devices
         deviceManager.updateShimmerState(DeviceConnectionManager.DeviceState.CONNECTED)
         deviceManager.updateRgbCameraState(DeviceConnectionManager.DeviceState.CONNECTED)
 
-        // Cleanup
         deviceManager.cleanup()
 
         assertEquals("Connected device count should be 0 after cleanup", 0, deviceManager.getConnectedDeviceCount())

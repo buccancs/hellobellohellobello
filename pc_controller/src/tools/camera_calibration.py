@@ -77,7 +77,6 @@ def _prepare_object_points(
 ) -> np.ndarray:
     cols, rows = board_size
     objp = np.zeros((rows * cols, 3), np.float32)
-    # grid of points (0,0), (1,0), ... scaled by square_size
     grid = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2)
     objp[:, :2] = grid * square_size
     return objp
@@ -102,7 +101,6 @@ def find_checkerboard_corners(
     if square_size <= 0:
         raise ValueError("square_size must be > 0.")
 
-    # If OpenCV is not available in the current environment, treat images as unreadable
     if not CV2_AVAILABLE:
         raise ValueError("No readable images provided for calibration.")
 
@@ -114,17 +112,14 @@ def find_checkerboard_corners(
     for p in image_paths:
         pp = Path(p)
         if not pp.exists():
-            # Skip non-existent paths to avoid OpenCV WARN logs from imread
             continue
         img = cv2.imread(str(pp), cv2.IMREAD_GRAYSCALE)
         if img is None:
-            # Skip unreadable images but continue; we will validate later
             continue
         if image_size is None:
             image_size = (img.shape[1], img.shape[0])
         ret, corners = cv2.findChessboardCorners(img, board_size, None)
         if ret:
-            # refine corners for better accuracy
             criteria = (
                 cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
                 30,
@@ -141,7 +136,6 @@ def find_checkerboard_corners(
             imgpoints.append(corners2)
 
     if image_size is None:
-        # no readable image found
         raise ValueError("No readable images provided for calibration.")
 
     if len(objpoints) == 0:
@@ -165,7 +159,7 @@ def calibrate_camera(
         image_paths, board_size, square_size
     )
 
-    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+    ret, mtx, dist, _rvecs, _tvecs = cv2.calibrateCamera(
         objpoints, imgpoints, image_size, None, None
     )
     if not ret:

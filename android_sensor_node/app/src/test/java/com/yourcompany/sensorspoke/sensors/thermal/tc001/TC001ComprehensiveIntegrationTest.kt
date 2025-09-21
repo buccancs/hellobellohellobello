@@ -44,40 +44,32 @@ class TC001ComprehensiveIntegrationTest {
     @Test
     fun `TC001 integration manager initialization`() =
         runTest {
-            // Test initialization
             val initResult = integrationManager.initializeSystem()
             assertTrue("TC001 integration manager should initialize successfully", initResult)
 
-            // Test system start
             val startResult = integrationManager.startSystem()
             assertTrue("TC001 system should start successfully", startResult)
 
-            // Test system ready state
             assertTrue("TC001 system should be ready", integrationManager.isSystemReady())
 
-            // Test component availability
             assertNotNull("TC001 connector should be available", integrationManager.getConnector())
             assertNotNull("TC001 data manager should be available", integrationManager.getDataManager())
             assertNotNull("TC001 UI controller should be available", integrationManager.getUIController())
 
-            // Test cleanup
             integrationManager.cleanup()
         }
 
     @Test
     fun `TC001 performance monitoring functionality`() =
         runTest {
-            // Start monitoring
             performanceMonitor.startMonitoring()
 
-            // Simulate thermal processing events
             repeat(50) {
                 performanceMonitor.recordFrameProcessed()
                 performanceMonitor.recordTemperatureReading(25.0f + it * 0.1f)
-                performanceMonitor.recordMemoryUsage(1024 * 1024 * 10L) // 10MB
+                performanceMonitor.recordMemoryUsage(1024 * 1024 * 10L)
             }
 
-            // Stop monitoring
             performanceMonitor.stopMonitoring()
 
             // Performance monitoring should complete without errors
@@ -87,13 +79,10 @@ class TC001ComprehensiveIntegrationTest {
     @Test
     fun `TC001 comprehensive integration workflow`() =
         runTest {
-            // Test complete integration workflow
 
-            // Step 1: Initialize integration manager
             val initResult = integrationManager.initializeSystem()
             assertTrue("Integration manager should initialize", initResult)
 
-            // Step 2: Start system
             val startResult = integrationManager.startSystem()
             assertTrue("System should start", startResult)
 
@@ -104,11 +93,9 @@ class TC001ComprehensiveIntegrationTest {
             }
             performanceMonitor.stopMonitoring()
 
-            // Step 4: Test diagnostics
             val diagnostics = diagnosticSystem.runComprehensiveDiagnostics()
             assertNotNull("Diagnostics should complete", diagnostics)
 
-            // Step 5: Cleanup
             integrationManager.cleanup()
         }
 
@@ -117,23 +104,19 @@ class TC001ComprehensiveIntegrationTest {
         runTest {
             val initialMemory = Runtime.getRuntime().freeMemory()
 
-            // Initialize system
             integrationManager.initializeSystem()
             integrationManager.startSystem()
             performanceMonitor.startMonitoring()
 
-            // Simulate heavy thermal processing load
             repeat(50) {
                 performanceMonitor.recordFrameProcessed()
                 performanceMonitor.recordMemoryUsage(1024 * 1024 * (it + 1).toLong())
                 performanceMonitor.recordTemperatureReading(25.0f + it * 0.1f)
             }
 
-            // Stop and cleanup
             performanceMonitor.stopMonitoring()
             integrationManager.cleanup()
 
-            // Suggest garbage collection
             System.gc()
             Thread.sleep(100)
 
@@ -141,7 +124,6 @@ class TC001ComprehensiveIntegrationTest {
             val memoryDifference = initialMemory - finalMemory
             val memoryDifferenceMB = memoryDifference / (1024.0 * 1024.0)
 
-            // Memory usage should be reasonable (< 50MB difference)
             assertTrue(
                 "Memory usage should be reasonable after cleanup",
                 memoryDifferenceMB < 50.0,

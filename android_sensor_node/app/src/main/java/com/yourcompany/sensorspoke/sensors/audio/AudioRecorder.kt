@@ -33,9 +33,9 @@ class AudioRecorder(
 
     companion object {
         private const val TAG = "AudioRecorder"
-        private const val SAMPLE_RATE = 44100 // 44.1 kHz as per FR5
-        private const val CHANNELS = 2 // Stereo
-        private const val BIT_RATE = 128000 // 128 kbps AAC
+        private const val SAMPLE_RATE = 44100
+        private const val CHANNELS = 2
+        private const val BIT_RATE = 128000
     }
 
     override suspend fun start(sessionDir: File) {
@@ -44,13 +44,11 @@ class AudioRecorder(
             initializeAudioRecorder()
             startRecording()
 
-            // Verify recording is actually working
             verifyRecordingStarted()
 
             Log.d(TAG, "Audio recording started successfully: ${audioFile?.absolutePath}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start audio recording: ${e.message}", e)
-            // Use comprehensive error handling instead of simple simulation
             handleAudioRecordingFailure(e)
         }
     }
@@ -67,10 +65,8 @@ class AudioRecorder(
     }
 
     private fun initializeAudioRecorder() {
-        // Create audio file
         audioFile = File(sessionDir!!, "audio_${System.currentTimeMillis()}.m4a")
 
-        // Initialize MediaRecorder
         mediaRecorder =
             MediaRecorder().apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
@@ -99,7 +95,6 @@ class AudioRecorder(
                 isRecording = true
                 recordingStartTime = System.nanoTime()
 
-                // Log recording start event with timestamp
                 logAudioEvent("RECORDING_STARTED", recordingStartTime)
 
                 Log.i(TAG, "MediaRecorder started successfully at $recordingStartTime")
@@ -117,12 +112,10 @@ class AudioRecorder(
                     recorder.stop()
                     isRecording = false
 
-                    // Log recording stop event with timestamp
                     logAudioEvent("RECORDING_STOPPED", System.nanoTime())
                 }
             } catch (e: RuntimeException) {
                 Log.e(TAG, "MediaRecorder stop failed", e)
-                // Continue cleanup even if stop fails
             }
         }
     }
@@ -163,19 +156,15 @@ class AudioRecorder(
 
         coroutineScope.launch(Dispatchers.IO) {
             try {
-                // Clean up any partially initialized recorder
                 cleanupMediaRecorder()
 
-                // Try alternative recording approaches
                 if (attemptAlternativeRecording()) {
                     Log.i(TAG, "Audio recording recovered using alternative method")
                     return@launch
                 }
 
-                // Create comprehensive error report
                 val errorReportFile = File(sessionDir!!, "audio_recording_error.json")
 
-                // Create error report using safe JSON construction
                 val errorReport = try {
                     val alternativeMethodsArray = JSONArray()
                         .put("MediaRecorder_retry")
@@ -197,10 +186,9 @@ class AudioRecorder(
                         .put("recovery_attempted", true)
                         .put("alternative_methods_tried", alternativeMethodsArray)
                         .put("system_info", systemInfo)
-                        .toString(2) // Pretty print with 2-space indent
+                        .toString(2)
                 } catch (jsonError: Exception) {
                     Log.e(TAG, "Failed to create error report JSON", jsonError)
-                    // Fallback to simple text report
                     """
                     {
                         "error_type": "AUDIO_RECORDING_FAILURE",
@@ -213,7 +201,6 @@ class AudioRecorder(
 
                 errorReportFile.writeText(errorReport)
 
-                // Log the failure for comprehensive diagnostics
                 logAudioEvent("RECORDING_FAILED", System.nanoTime(), error.message ?: "Unknown error")
                 logAudioEvent("ERROR_REPORT_CREATED", System.nanoTime(), errorReportFile.name)
             } catch (reportError: Exception) {
@@ -230,11 +217,8 @@ class AudioRecorder(
             // Try different audio formats and configurations
             val alternativeConfigs =
                 listOf(
-                    // High quality AAC
                     Triple(MediaRecorder.AudioEncoder.AAC, MediaRecorder.OutputFormat.MPEG_4, "audio_hq.m4a"),
-                    // Standard AAC
                     Triple(MediaRecorder.AudioEncoder.AAC, MediaRecorder.OutputFormat.THREE_GPP, "audio_std.3gp"),
-                    // AMR fallback (widely supported)
                     Triple(MediaRecorder.AudioEncoder.AMR_NB, MediaRecorder.OutputFormat.AMR_NB, "audio_amr.amr"),
                 )
 
@@ -274,13 +258,11 @@ class AudioRecorder(
      * Verify that audio recording is actually working by checking file growth
      */
     private suspend fun verifyRecordingStarted() {
-        // Wait a moment for recording to stabilize
         kotlinx.coroutines.delay(500)
 
         try {
-            // Check if the audio file is being written to
             val initialSize = audioFile?.length() ?: 0
-            kotlinx.coroutines.delay(1000) // Wait 1 second
+            kotlinx.coroutines.delay(1000)
             val currentSize = audioFile?.length() ?: 0
 
             if (currentSize > initialSize && currentSize > 0) {
@@ -291,9 +273,8 @@ class AudioRecorder(
                 logAudioEvent("RECORDING_VERIFICATION_FAILED", System.nanoTime(), "File size unchanged: $currentSize")
             }
 
-            // Additional verification through MediaRecorder state (if available)
             if (isRecording) {
-                val recordingDuration = (System.nanoTime() - recordingStartTime) / 1_000_000 // Convert to ms
+                val recordingDuration = (System.nanoTime() - recordingStartTime) / 1_000_000
                 Log.d(TAG, "Recording duration verification: ${recordingDuration}ms")
                 logAudioEvent("RECORDING_DURATION_CHECK", System.nanoTime(), "Duration: ${recordingDuration}ms")
             }

@@ -30,13 +30,11 @@ class DataLoader:
     def index_files(self) -> SessionData:
         csv_files: dict[str, str] = {}
         video_files: dict[str, str] = {}
-        # Find CSVs recursively
         for path in glob.glob(
             os.path.join(self.session_dir, "**", "*.csv"), recursive=True
         ):
             name = os.path.relpath(path, self.session_dir)
             csv_files[name.replace("\\", "/")] = path
-        # Find videos
         for ext in self.SUPPORTED_VIDEO_EXT:
             for path in glob.glob(
                 os.path.join(self.session_dir, "**", f"*{ext}"), recursive=True
@@ -49,10 +47,8 @@ class DataLoader:
         """Load a CSV into a DataFrame with timestamp_ns as int index if present."""
         full = os.path.join(self.session_dir, rel_name)
         if not os.path.exists(full):
-            # Try already full path
             full = rel_name
         df = pd.read_csv(full)
-        # Normalize timestamp column
         ts_col = None
         for cand in ("timestamp_ns", "ts_ns", "timestamp", "time_ns"):
             if cand in df.columns:

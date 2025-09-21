@@ -32,12 +32,10 @@ def export_session_to_hdf5(
     """
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     with h5py.File(output_path, "w") as hf:
-        # Root attributes
         if metadata is not None:
             hf.attrs["session_metadata_json"] = json.dumps(metadata)
         if annotations is not None:
             hf.attrs["annotations_json"] = json.dumps(annotations)
-        # Walk CSVs
         for csv_path in glob.glob(
             os.path.join(session_dir, "**", "*.csv"), recursive=True
         ):
@@ -47,14 +45,12 @@ def export_session_to_hdf5(
             modality_name = os.path.splitext(parts[-1])[0]
             group = hf.require_group(f"/{device}/{modality_name}")
             df = pd.read_csv(csv_path)
-            # Determine timestamp column if any
             ts_col = None
             for cand in ("timestamp_ns", "ts_ns", "timestamp", "time_ns"):
                 if cand in df.columns:
                     ts_col = cand
                     break
             if ts_col is not None:
-                # Preserve alignment by masking invalid timestamps once
                 ts_ser = pd.to_numeric(df[ts_col], errors="coerce")
                 mask = ts_ser.notna()
                 df = df.loc[mask].copy()
@@ -62,11 +58,8 @@ def export_session_to_hdf5(
                 ts_ds = group.create_dataset(
                     "timestamp_ns", data=ts_np, compression="gzip", compression_opts=4
                 )
-                # Attach basic units attribute
                 with contextlib.suppress(Exception):
                     ts_ds.attrs["units"] = "ns"
-                # Robust sample rate estimation from positive diffs on sorted timestamps
-                # with trimming
                 sample_rate_hz = None
                 try:
                     if ts_np.size >= 2:
@@ -88,7 +81,6 @@ def export_session_to_hdf5(
             else:
                 sample_rate_hz = None
                 data_cols = list(df.columns)
-            # Store each remaining column (preserve alignment; numeric arrays keep NaNs)
             for col in data_cols:
                 ds = None
                 data = None
@@ -105,12 +97,10 @@ def export_session_to_hdf5(
                             col, data=data, compression="gzip", compression_opts=4
                         )
                 except Exception:
-                    # Fallback: store as strings preserving length
                     data = df[col].astype(str).to_numpy(dtype="S")
                     ds = group.create_dataset(
                         col, data=data, compression="gzip", compression_opts=4
                     )
-                # Attach units/sample_rate when known by convention
                 try:
                     lname = col.lower()
                     if lname == "gsr_microsiemens":
@@ -119,7 +109,6 @@ def export_session_to_hdf5(
                         ds.attrs["units"] = "raw_counts"
                     elif lname in ("w", "width") or lname in ("h", "height"):
                         ds.attrs["units"] = "pixels"
-                    # attach sample rate to numeric datasets if known (numeric dtypes only)
                     if (
                         sample_rate_hz is not None
                         and data is not None
@@ -129,9 +118,7 @@ def export_session_to_hdf5(
                         ds.attrs["sample_rate_hz"] = float(sample_rate_hz)
                 except Exception:
                     pass
-        # Sync group: clock offsets and stats to ease downstream analysis
         try:
-            # Prefer provided metadata; fallback to session_metadata.json in session_dir
             meta_src = metadata if isinstance(metadata, dict) else None
             if meta_src is None:
                 meta_path = os.path.join(session_dir, "session_metadata.json")
@@ -142,9 +129,8 @@ def export_session_to_hdf5(
                 offsets = meta_src.get("clock_offsets_ns", {})
                 if isinstance(offsets, dict) and len(offsets):
                     sync_grp = hf.require_group("/sync")
-                    # Device ids as UTF-8 strings
                     try:
-                        import numpy as _np  # local import to avoid hard dep in signature
+                        import numpy as _np
 
                         str_dtype = h5py.string_dtype(encoding="utf-8")
                         dev_ids = list(offsets.keys())
@@ -166,7 +152,6 @@ def export_session_to_hdf5(
                 # Optional sync stats: store as JSON dataset if available
                 stats_obj = meta_src.get("sync_stats", None)
                 if stats_obj is None:
-                    # Fallback to 'clock_sync' used by GUI
                     stats_obj = meta_src.get("clock_sync", None)
                 if stats_obj is not None:
                     sync_grp = hf.require_group("/sync")
@@ -177,6 +162,5 @@ def export_session_to_hdf5(
                     except Exception:
                         pass
         except Exception:
-            # Do not fail export if sync info missing
             pass
     return output_path

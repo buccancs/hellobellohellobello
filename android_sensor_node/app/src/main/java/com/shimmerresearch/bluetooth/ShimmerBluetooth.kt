@@ -6,12 +6,10 @@ package com.shimmerresearch.bluetooth
  */
 interface ShimmerBluetooth {
     companion object {
-        // Message identifiers
         const val MSG_IDENTIFIER_DATA_PACKET = 0x10
         const val MSG_IDENTIFIER_STATE_CHANGE = 0x11
         const val MSG_IDENTIFIER_NOTIFICATION_MESSAGE = 0x12
 
-        // Command bytes
         const val START_STREAMING_COMMAND = 0x07.toByte()
         const val STOP_STREAMING_COMMAND = 0x20.toByte()
         const val GET_SAMPLING_RATE_COMMAND = 0x03.toByte()

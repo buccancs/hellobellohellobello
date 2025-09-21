@@ -19,7 +19,7 @@ class DeviceInfo:
     device_id: str
     first_seen_ns: int
     last_heartbeat_ns: int
-    status: str  # Online | Offline
+    status: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -62,7 +62,6 @@ class DeviceManager:
             self.register(device_id)
             info = self._devices[device_id]
         info.last_heartbeat_ns = now
-        # Only change status to Online if it was Offline, otherwise preserve current status
         if info.status == "Offline":
             info.status = "Online"
 

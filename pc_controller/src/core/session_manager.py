@@ -20,13 +20,11 @@ try:
     # Centralized config loader (NFR8)
     from pc_controller.src.config import get as cfg_get
 except ImportError:
-    # Fallback for different module contexts (tests, scripts, etc.)
     try:
         from ..config import get as cfg_get
     except ImportError:
         import sys
 
-        # Try to add the project root to Python path
         project_root = Path(__file__).parents[3]
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
@@ -47,7 +45,7 @@ class SessionMetadata:
     name: str
     created_at_ns: int
     created_at: str
-    state: str  # Created | Recording | Stopped
+    state: str
     start_time_ns: int | None = None
     end_time_ns: int | None = None
     duration_ns: int | None = None
@@ -55,13 +53,11 @@ class SessionMetadata:
 
 class SessionManager:
     def __init__(self, base_dir: str | None = None) -> None:
-        # Align default with GUI's current behavior
         self._base_dir = Path(base_dir or (Path.cwd() / "pc_controller_data")).resolve()
         self._active_id: str | None = None
         self._active_dir: Path | None = None
         self._meta: SessionMetadata | None = None
 
-    # Read-only properties
     @property
     def base_dir(self) -> Path:
         return self._base_dir
@@ -101,7 +97,6 @@ class SessionManager:
                 "A session is already active; stop it before creating a new one."
             )
         self._ensure_base()
-        # Use timestamp for uniqueness
         ts = time.strftime("%Y%m%d_%H%M%S")
         sid = f"{ts}_{_sanitize(name)}" if name else ts
         sdir = self._base_dir / sid
@@ -156,13 +151,11 @@ class SessionManager:
                 dur = max(0, int(end_ns - int(self._meta.start_time_ns)))
                 self._meta.duration_ns = int(dur)
         except Exception:
-            # Keep duration_ns as None if computation fails
             pass
         self._write_metadata()
 
 
 def _sanitize(name: str) -> str:
-    # Remove path separators and trim spaces
     return (
         "".join(ch for ch in name if ch.isalnum() or ch in ("-", "_", ".")).strip("._-")
         or "session"

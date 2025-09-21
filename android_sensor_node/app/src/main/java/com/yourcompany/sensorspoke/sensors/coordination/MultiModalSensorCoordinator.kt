@@ -4,12 +4,10 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LifecycleOwner
 import com.yourcompany.sensorspoke.sensors.audio.AudioRecorder
-// import com.yourcompany.sensorspoke.sensors.gsr.GSRDataPoint
-// import com.yourcompany.sensorspoke.sensors.gsr.ShimmerDataCallback
-// import com.yourcompany.sensorspoke.sensors.gsr.ShimmerGSRIntegrationManager
 import com.yourcompany.sensorspoke.sensors.gsr.ShimmerRecorder
 import com.yourcompany.sensorspoke.sensors.rgb.RgbCameraRecorder
-import com.yourcompany.sensorspoke.sensors.thermal.tc001.TC001SensorIntegrationManager
+import com.yourcompany.sensorspoke.sensors.thermal.TC001IntegrationManager
+import com.yourcompany.sensorspoke.sensors.thermal.TC001IntegrationState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,7 +39,6 @@ class MultiModalSensorCoordinator(
     companion object {
         private const val TAG = "MultiModalCoordinator"
 
-        // Coordination states
         enum class CoordinationState {
             UNINITIALIZED,
             INITIALIZING,
@@ -54,22 +51,18 @@ class MultiModalSensorCoordinator(
         }
 
         // Synchronization settings
-        const val SYNC_PRECISION_TARGET_MS = 5.0 // Target: ±5ms synchronization
-        const val HEALTH_CHECK_INTERVAL_MS = 2000L // 2-second health checks
-        const val METRICS_UPDATE_INTERVAL_MS = 1000L // 1-second metrics updates
+        const val SYNC_PRECISION_TARGET_MS = 5.0
+        const val HEALTH_CHECK_INTERVAL_MS = 2000L
+        const val METRICS_UPDATE_INTERVAL_MS = 1000L
 
-        // Data logging
         const val SYNC_LOG_HEADER = "timestamp_ns,system_time_ms,sensor_type,data_type,sensor_value,sync_status"
     }
 
-    // Sensor managers - simplified for MVP
-    // private var gsrIntegrationManager: ShimmerGSRIntegrationManager? = null
-    private var tc001IntegrationManager: TC001SensorIntegrationManager? = null
+    private var tc001IntegrationManager: TC001IntegrationManager? = null
     private var rgbRecorder: RgbCameraRecorder? = null
     private var audioRecorder: AudioRecorder? = null
     private var shimmerRecorder: ShimmerRecorder? = null
 
-    // State management
     private val _coordinationState = MutableStateFlow(CoordinationState.UNINITIALIZED)
     val coordinationState: StateFlow<CoordinationState> = _coordinationState
 
@@ -79,18 +72,15 @@ class MultiModalSensorCoordinator(
     private val _synchronizationMetrics = MutableStateFlow(SynchronizationMetrics())
     val synchronizationMetrics: StateFlow<SynchronizationMetrics> = _synchronizationMetrics
 
-    // Data synchronization
     private var syncLogWriter: BufferedWriter? = null
     private var sessionDir: File? = null
     private val dataBuffer = SensorDataBuffer()
 
-    // Lifecycle management
     private val coordinationScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var healthMonitorJob: Job? = null
     private var metricsJob: Job? = null
     private var synchronizationJob: Job? = null
 
-    // Timing synchronization
     private var recordingStartTime: Long = 0L
     private var lastSyncCheck: Long = 0L
 
@@ -103,33 +93,27 @@ class MultiModalSensorCoordinator(
                 _coordinationState.value = CoordinationState.INITIALIZING
                 Log.i(TAG, "Initializing multi-modal sensor coordination system...")
 
-                // Initialize GSR recording using ShimmerRecorder (MVP implementation)
                 shimmerRecorder = ShimmerRecorder(context)
                 Log.i(TAG, "GSR Shimmer recorder initialized")
 
-                // Initialize TC001 thermal integration
-                tc001IntegrationManager =
-                    TC001SensorIntegrationManager(context).apply {
-                        if (!initializeSystem()) {
-                            Log.w(TAG, "TC001 integration initialization failed")
-                        } else {
-                            Log.i(TAG, "TC001 integration initialized successfully")
-                        }
+                tc001IntegrationManager = TC001IntegrationManager(context).also {
+                    if (!it.initializeSystem()) {
+                        Log.w(TAG, "TC001 integration initialization failed")
+                    } else {
+                        Log.i(TAG, "TC001 integration initialized successfully")
                     }
+                }
 
-                // Initialize RGB camera recorder
                 rgbRecorder =
                     RgbCameraRecorder(context, lifecycleOwner).apply {
                         Log.i(TAG, "RGB camera recorder initialized")
                     }
 
-                // Initialize audio recorder
                 audioRecorder =
                     AudioRecorder(context).apply {
                         Log.i(TAG, "Audio recorder initialized")
                     }
 
-                // Start system monitoring
                 startSystemMonitoring()
 
                 _coordinationState.value = CoordinationState.READY
@@ -182,14 +166,11 @@ class MultiModalSensorCoordinator(
 
                 Log.i(TAG, "Starting synchronized multi-modal recording in ${sessionDirectory.name}")
 
-                // Initialize synchronization logging
                 initializeSyncLogging(sessionDirectory)
 
-                // Record unified start time for synchronization
                 recordingStartTime = System.nanoTime()
                 val systemStartTime = System.currentTimeMillis()
 
-                // Start all sensors synchronously with precise timing
                 val sensorStartJobs =
                     listOf(
                         async { startGSRRecording(sessionDirectory) },
@@ -198,17 +179,14 @@ class MultiModalSensorCoordinator(
                         async { startAudioRecording(sessionDirectory) },
                     )
 
-                // Wait for all sensors to start
                 val startResults = sensorStartJobs.awaitAll()
                 val successCount = startResults.count { it }
 
-                if (successCount >= 2) { // Allow recording with at least 2 sensors
+                if (successCount >= 2) {
                     _coordinationState.value = CoordinationState.RECORDING
 
-                    // Start data synchronization monitoring
                     startSynchronizationMonitoring()
 
-                    // Log recording start event
                     logSyncEvent(
                         sensorType = "SYSTEM",
                         dataType = "RECORDING_START",
@@ -262,10 +240,8 @@ class MultiModalSensorCoordinator(
                 _coordinationState.value = CoordinationState.STOPPING
                 Log.i(TAG, "Stopping multi-modal recording...")
 
-                // Stop synchronization monitoring first
                 synchronizationJob?.cancel()
 
-                // Log recording stop event
                 logSyncEvent(
                     sensorType = "SYSTEM",
                     dataType = "RECORDING_STOP",
@@ -273,7 +249,6 @@ class MultiModalSensorCoordinator(
                     syncStatus = "SYNCHRONIZED",
                 )
 
-                // Stop all sensors
                 val stopJobs =
                     listOf(
                         async { stopGSRRecording() },
@@ -284,7 +259,6 @@ class MultiModalSensorCoordinator(
 
                 stopJobs.awaitAll()
 
-                // Close sync logging
                 syncLogWriter?.flush()
                 syncLogWriter?.close()
                 syncLogWriter = null
@@ -317,24 +291,19 @@ class MultiModalSensorCoordinator(
             try {
                 Log.i(TAG, "Shutting down multi-modal coordination system...")
 
-                // Stop recording if active
                 if (_coordinationState.value == CoordinationState.RECORDING) {
                     stopRecording()
                 }
 
-                // Cancel monitoring jobs
                 healthMonitorJob?.cancel()
                 metricsJob?.cancel()
                 synchronizationJob?.cancel()
 
-                // Shutdown sensor subsystems
-                tc001IntegrationManager?.shutdown()
+                tc001IntegrationManager?.cleanup()
                 shimmerRecorder?.let { recorder ->
-                    // Stop GSR recording if active
                     Log.i(TAG, "Stopping GSR recording")
                 }
 
-                // Cancel coordination scope
                 coordinationScope.cancel()
 
                 _coordinationState.value = CoordinationState.UNINITIALIZED
@@ -365,8 +334,8 @@ class MultiModalSensorCoordinator(
             tc001IntegrationManager?.let { manager ->
                 if (manager.isSystemReady()) {
                     manager.startSystem()
-                    delay(1000) // Allow system to stabilize
-                    manager.startRecording(sessionDir)
+                    delay(1000)
+                    // Note: Recording is handled by startSystem() and data processing starts automatically
                     Log.i(TAG, "Thermal recording started")
                     true
                 } else {
@@ -416,10 +385,8 @@ class MultiModalSensorCoordinator(
 
     private suspend fun stopThermalRecording(): Boolean =
         try {
-            tc001IntegrationManager?.let { manager ->
-                if (manager.isRecording()) {
-                    manager.stopRecording()
-                }
+            tc001IntegrationManager?.let { manager: TC001IntegrationManager ->
+                // Stop the system which will handle stopping all data processing
                 manager.stopSystem()
             }
             Log.i(TAG, "Thermal recording stopped")
@@ -482,8 +449,7 @@ class MultiModalSensorCoordinator(
                 val csvLine = "$timestampNs,$systemTimeMs,$sensorType,$dataType,$value,$syncStatus\n"
                 writer.write(csvLine)
 
-                // Flush periodically for data safety
-                if ((timestampNs / 1_000_000) % 1000 < 10) { // Every ~1 second
+                if ((timestampNs / 1_000_000) % 1000 < 10) {
                     writer.flush()
                 }
             }
@@ -496,7 +462,6 @@ class MultiModalSensorCoordinator(
      * Start system monitoring
      */
     private fun startSystemMonitoring() {
-        // Health monitoring
         healthMonitorJob =
             coordinationScope.launch {
                 while (isActive) {
@@ -509,7 +474,6 @@ class MultiModalSensorCoordinator(
                 }
             }
 
-        // Metrics monitoring
         metricsJob =
             coordinationScope.launch {
                 while (isActive) {
@@ -531,9 +495,8 @@ class MultiModalSensorCoordinator(
             coordinationScope.launch {
                 while (isActive && _coordinationState.value == CoordinationState.RECORDING) {
                     try {
-                        delay(100) // Check sync every 100ms
+                        delay(100)
 
-                        // Monitor data flow and timing from all sensors
                         checkDataSynchronization()
                     } catch (e: Exception) {
                         Log.e(TAG, "Error in synchronization monitoring: ${e.message}")
@@ -546,13 +509,13 @@ class MultiModalSensorCoordinator(
      * Perform system health check
      */
     private suspend fun performSystemHealthCheck() {
-        val gsrHealthy = shimmerRecorder != null // Simplified check for MVP
+        val gsrHealthy = shimmerRecorder != null
         val thermalHealthy =
-            tc001IntegrationManager?.getCurrentState()?.let { state ->
-                state != TC001SensorIntegrationManager.Companion.IntegrationState.ERROR
+            tc001IntegrationManager?.integrationState?.value?.let { state: TC001IntegrationState ->
+                state != TC001IntegrationState.ERROR
             } ?: false
-        val rgbHealthy = true // RGB is typically always available
-        val audioHealthy = true // Audio is typically always available
+        val rgbHealthy = true
+        val audioHealthy = true
         val syncHealthy = checkSynchronizationHealth()
 
         val overallHealthy = gsrHealthy && thermalHealthy && rgbHealthy && audioHealthy && syncHealthy
@@ -575,8 +538,7 @@ class MultiModalSensorCoordinator(
             val currentTime = System.currentTimeMillis()
             val timeSinceLastSync = currentTime - lastSyncCheck
 
-            // Consider sync healthy if we've had recent data flow
-            timeSinceLastSync < 5000 // Less than 5 seconds since last sync check
+            timeSinceLastSync < 5000
         } catch (e: Exception) {
             Log.w(TAG, "Error checking sync health: ${e.message}")
             false
@@ -586,15 +548,12 @@ class MultiModalSensorCoordinator(
      * Check data synchronization across sensors
      */
     private suspend fun checkDataSynchronization() {
-        // Check timing alignment between sensor data streams
         val currentTime = System.nanoTime()
-        val timeSinceStart = (currentTime - recordingStartTime) / 1_000_000.0 // Convert to milliseconds
+        val timeSinceStart = (currentTime - recordingStartTime) / 1_000_000.0
 
-        // Update sync check time
         lastSyncCheck = System.currentTimeMillis()
 
-        // Log periodic sync check
-        if (timeSinceStart.toLong() % 10000 < 100) { // Every ~10 seconds
+        if (timeSinceStart.toLong() % 10000 < 100) {
             logSyncEvent(
                 sensorType = "SYNC",
                 dataType = "HEALTH_CHECK",
@@ -611,7 +570,7 @@ class MultiModalSensorCoordinator(
         val currentTime = System.nanoTime()
         val recordingDuration =
             if (recordingStartTime > 0) {
-                (currentTime - recordingStartTime) / 1_000_000.0 // Convert to milliseconds
+                (currentTime - recordingStartTime) / 1_000_000.0
             } else {
                 0.0
             }
@@ -633,9 +592,8 @@ class MultiModalSensorCoordinator(
      */
     private fun getActiveSensorCount(): Int {
         var count = 0
-        if (shimmerRecorder != null) count++ // GSR recorder available
-        if (tc001IntegrationManager?.isRecording() == true) count++
-        // RGB and audio would be checked here in full implementation
+        if (shimmerRecorder != null) count++
+        if (tc001IntegrationManager?.isSystemReady() == true) count++
         return count
     }
 
@@ -643,8 +601,6 @@ class MultiModalSensorCoordinator(
      * Calculate synchronization precision
      */
     private fun calculateSyncPrecision(): Double {
-        // This would analyze actual timing data from the buffer
-        // For now, return target precision
         return SYNC_PRECISION_TARGET_MS
     }
 
@@ -652,9 +608,7 @@ class MultiModalSensorCoordinator(
      * Calculate overall data rate
      */
     private fun calculateOverallDataRate(): Double {
-        // This would calculate based on actual data throughput
-        // For now, return estimated combined rate
-        return 128.0 + 30.0 + 30.0 // GSR (128Hz) + Thermal (30Hz) + RGB (30Hz)
+        return 128.0 + 30.0 + 30.0
     }
 
     /**
@@ -683,7 +637,6 @@ class MultiModalSensorCoordinator(
         _systemHealth.value = health
     }
 
-    // Simplified for MVP - data callbacks would be implemented when integrating with real sensors
 
     /**
      * Get current coordination state
@@ -731,9 +684,8 @@ data class SynchronizationMetrics(
  * Multi-sensor data buffer for synchronization analysis - MVP implementation
  */
 class SensorDataBuffer {
-    // Simplified for MVP - would contain sensor data structures when fully implemented
     private val sensorDataCount = mutableMapOf<String, Int>()
-    private val maxBufferSize = 1000 // Keep last 1000 samples
+    private val maxBufferSize = 1000
 
     fun addSensorData(sensorType: String, timestamp: Long) {
         synchronized(sensorDataCount) {

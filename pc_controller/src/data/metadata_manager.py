@@ -31,7 +31,7 @@ class DeviceInfo:
     """Information about a recording device."""
 
     device_id: str
-    device_type: str  # "android", "pc"
+    device_type: str
     device_name: str
     model: str
     os_version: str
@@ -39,16 +39,16 @@ class DeviceInfo:
     ip_address: str
     sensors: list[str]
     time_offset_ns: int | None = None
-    sync_quality: str | None = None  # "excellent", "good", "poor"
+    sync_quality: str | None = None
 
 
 @dataclass
 class SensorConfig:
     """Configuration for a specific sensor."""
 
-    sensor_type: str  # "rgb", "gsr", "thermal"
+    sensor_type: str
     sampling_rate: float | None = None
-    resolution: str | None = None  # e.g., "1080p", "256x192"
+    resolution: str | None = None
     settings: dict[str, str | int | float] | None = None
 
 
@@ -56,10 +56,9 @@ class SensorConfig:
 class SessionMetadata:
     """Complete session metadata structure."""
 
-    # Session identification
     session_id: str
     participant_id: str
-    created_at: str  # ISO 8601 timestamp
+    created_at: str
     duration_seconds: float | None = None
 
     # Recording configuration
@@ -68,22 +67,18 @@ class SessionMetadata:
     time_sync_enabled: bool = True
     tls_enabled: bool = False
 
-    # Devices and sensors
     devices: list[DeviceInfo] | None = None
     sensor_configs: list[SensorConfig] | None = None
 
-    # Data files and structure
     data_files: list[str] | None = None
     csv_schema_version: str = "1.0"
     image_formats: dict[str, str] | None = (
-        None  # e.g., {"rgb": "DNG", "thermal": "PNG"}
+        None
     )
 
-    # Privacy and compliance
     anonymized: bool = True
     face_blurring_enabled: bool = False
 
-    # Additional metadata
     notes: str = ""
     tags: list[str] | None = None
 
@@ -142,7 +137,7 @@ class SessionMetadataManager:
             image_formats={
                 "rgb": "DNG",
                 "thermal": "PNG",
-            },  # Phase 3 format requirements
+            },
         )
 
         self._sessions[session_id] = metadata
@@ -264,10 +259,8 @@ class SessionMetadataManager:
 
             metadata = self._sessions[session_id]
 
-            # Convert to dict and handle dataclasses
             metadata_dict = asdict(metadata)
 
-            # Ensure JSON serializable
             metadata_dict = self._ensure_json_serializable(metadata_dict)
 
             with open(metadata_file, "w") as f:
@@ -305,10 +298,12 @@ class SessionMetadataManager:
             with open(metadata_file) as f:
                 data = json.load(f)
 
-            # Convert back to dataclasses
-            data["devices"] = [DeviceInfo(**device_data) for device_data in data.get("devices", [])]
+            data["devices"] = [
+                DeviceInfo(**device_data) for device_data in data.get("devices", [])
+            ]
             data["sensor_configs"] = [
-                SensorConfig(**config_data) for config_data in data.get("sensor_configs", [])
+                SensorConfig(**config_data)
+                for config_data in data.get("sensor_configs", [])
             ]
 
             metadata = SessionMetadata(**data)
@@ -348,11 +343,12 @@ class SessionMetadataManager:
                 "h": "Frame height (192)",
                 "min_temp_celsius": "Minimum temperature in frame (Celsius)",
                 "max_temp_celsius": "Maximum temperature in frame (Celsius)",
-                # Add flattened pixel values for thermal data
                 **{
                     f"v{i}": f"Temperature value at pixel {i}"
-                    for i in range(0, 49152, 1000)[:50]  # 256x192 = 49152 pixels, sample every 1000
-                }
+                    for i in range(0, 49152, 1000)[
+                        :50
+                    ]
+                },
             },
         }
 
@@ -379,12 +375,11 @@ class SessionMetadataManager:
         Returns:
             Anonymized participant ID
         """
-        # Simple anonymization - in production might use more sophisticated methods
         import hashlib
 
         hash_object = hashlib.sha256(participant_id.encode())
         hex_dig = hash_object.hexdigest()
-        return f"P_{hex_dig[:8]}"  # Use first 8 characters of hash
+        return f"P_{hex_dig[:8]}"
 
     def _ensure_json_serializable(self, obj):
         """Ensure object is JSON serializable."""
@@ -395,7 +390,6 @@ class SessionMetadataManager:
         elif isinstance(obj, str | int | float | bool) or obj is None:
             return obj
         else:
-            # Convert other types to string
             return str(obj)
 
     def get_session_summary(

@@ -47,7 +47,6 @@ def test_find_checkerboard_corners_invalid_inputs():
 
 
 def test_find_checkerboard_corners_unreadable_images(tmp_path: Path):
-    # Provide nonexistent image paths; should fail with no readable images
     img1 = tmp_path / "does_not_exist1.jpg"
     img2 = tmp_path / "does_not_exist2.jpg"
     with pytest.raises(ValueError, match="No readable images"):

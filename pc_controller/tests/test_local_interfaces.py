@@ -11,15 +11,14 @@ import pytest
 
 np = pytest.importorskip("numpy")
 
-# Import after numpy availability check
-from pc_controller.src.core.local_interfaces import ShimmerInterface, WebcamInterface  # noqa: E402
+from pc_controller.src.core.local_interfaces import ShimmerInterface, WebcamInterface
 
 
 def test_shimmer_interface_produces_samples() -> None:
     shimmer = ShimmerInterface()
     shimmer.start()
     try:
-        time.sleep(0.15)  # allow some samples to accumulate (~19 at 128 Hz)
+        time.sleep(0.15)
         ts, vals = shimmer.get_latest_samples()
         # [DEBUG_LOG] sizes
         print(f"[DEBUG_LOG] shimmer samples: {ts.size}")
@@ -27,9 +26,7 @@ def test_shimmer_interface_produces_samples() -> None:
         assert ts.dtype == np.float64
         assert vals.dtype == np.float64
         assert ts.size > 0
-        # Timestamps should be monotonic increasing
         assert np.all(np.diff(ts) >= 0)
-        # Values should be finite
         assert np.all(np.isfinite(vals))
     finally:
         shimmer.stop()
@@ -39,7 +36,6 @@ def test_webcam_interface_returns_frame() -> None:
     cam = WebcamInterface()
     cam.start()
     try:
-        # Give it a moment to generate/capture a frame
         for _ in range(20):
             frame = cam.get_latest_frame()
             if frame is not None:

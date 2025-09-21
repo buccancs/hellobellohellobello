@@ -71,7 +71,7 @@ class ShimmerDataProcessorTest {
         val sample = ShimmerDataProcessor.SensorSample(
             timestampNs = 1234567890123456L,
             timestampMs = 1234567890L,
-            gsrKohms = 123.456789, // Test precision handling
+            gsrKohms = 123.456789,
             gsrRaw12bit = 3000,
             ppgRaw = 2500,
             connectionStatus = "CONNECTED",
@@ -80,7 +80,6 @@ class ShimmerDataProcessorTest {
 
         val csvLine = dataProcessor.formatSampleForCsv(sample, 42)
 
-        // Check that GSR value is formatted to 3 decimal places
         assertTrue("CSV should contain properly formatted GSR value", csvLine.contains("123.457"))
         assertTrue("CSV should contain sample number", csvLine.contains("42"))
         assertTrue("CSV should contain all required fields", csvLine.split(",").size == 8)
@@ -88,12 +87,11 @@ class ShimmerDataProcessorTest {
 
     @Test
     fun testGsrRaw12BitRange() {
-        // Test that GSR raw values are within 12-bit range
         val sample = ShimmerDataProcessor.SensorSample(
             timestampNs = System.nanoTime(),
             timestampMs = System.currentTimeMillis(),
             gsrKohms = 100.0,
-            gsrRaw12bit = 4095, // Maximum 12-bit value
+            gsrRaw12bit = 4095,
             ppgRaw = 2000,
             connectionStatus = "CONNECTED",
             dataIntegrity = "OK",

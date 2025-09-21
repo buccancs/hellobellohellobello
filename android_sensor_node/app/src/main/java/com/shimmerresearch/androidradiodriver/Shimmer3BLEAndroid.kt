@@ -37,12 +37,10 @@ class Shimmer3BLEAndroid(
     companion object {
         private const val TAG = "Shimmer3BLEAndroid"
 
-        // Shimmer3 BLE Service UUIDs
         private val SHIMMER_SERVICE_UUID = UUID.fromString("49535343-fe7d-4ae5-8fa9-9fafd205e455")
         private val DATA_CHARACTERISTIC_UUID = UUID.fromString("49535343-1e4d-4bd9-ba61-23c647249616")
         private val COMMAND_CHARACTERISTIC_UUID = UUID.fromString("49535343-8841-43f4-a8d4-ecbe34729bb3")
 
-        // Shimmer commands
         private const val START_STREAMING_COMMAND = 0x07.toByte()
         private const val STOP_STREAMING_COMMAND = 0x20.toByte()
         private const val GET_SAMPLING_RATE_COMMAND = 0x03.toByte()
@@ -50,21 +48,18 @@ class Shimmer3BLEAndroid(
         private const val SET_SENSORS_COMMAND = 0x08.toByte()
         private const val GET_SENSORS_COMMAND = 0x09.toByte()
 
-        // Data packet constants
         private const val DATA_PACKET_SIZE = 20
         private const val TIMESTAMP_BYTES = 3
         private const val GSR_BYTES = 2
         private const val PPG_BYTES = 2
     }
 
-    // BLE connection management
     private var mBleDevice: BleDevice? = null
     private var mIsScanning = false
     private val mDataQueue = ConcurrentLinkedQueue<ByteArray>()
     private var mDataProcessingJob: Job? = null
     private var mSimulationJob: Job? = null
 
-    // Data parsing
     private var mPacketCounter = 0L
     private var mLastTimestamp = 0L
     private var mSampleCount = 0L
@@ -81,7 +76,6 @@ class Shimmer3BLEAndroid(
         Log.i(TAG, "Connecting to Shimmer3 BLE device: $bluetoothAddress")
 
         try {
-            // Start BLE scanning for specific device
             scanAndConnect(bluetoothAddress, deviceName)
         } catch (e: Exception) {
             Log.e(TAG, "Error initiating connection: ${e.message}", e)
@@ -127,7 +121,6 @@ class Shimmer3BLEAndroid(
                 }
 
                 override fun onScanning(bleDevice: BleDevice) {
-                    // Continue scanning
                 }
 
                 override fun onScanFinished(scanResultList: List<BleDevice>) {
@@ -181,7 +174,7 @@ class Shimmer3BLEAndroid(
 
                     // Initialize device configuration
                     mDataProcessingScope?.launch {
-                        delay(1000) // Allow connection to stabilize
+                        delay(1000)
                         initializeShimmerConfiguration()
                     }
                 }
@@ -212,10 +205,8 @@ class Shimmer3BLEAndroid(
             val sensorConfig = SENSOR_GSR or SENSOR_INT_A13 or SENSOR_TIMESTAMP
             setEnabledSensors(sensorConfig.toLong())
 
-            // Set sampling rate to 128Hz
             setSamplingRateShimmer(128.0)
 
-            // Set GSR range to most sensitive
             setGSRRange(GSR_RANGE_4_7M)
 
             delay(500) // Allow configuration to settle
@@ -259,7 +250,6 @@ class Shimmer3BLEAndroid(
 
         try {
             mBleDevice?.let { device ->
-                // Send start streaming command
                 val command = byteArrayOf(START_STREAMING_COMMAND)
                 BleManager.getInstance().write(
                     device,
@@ -285,7 +275,6 @@ class Shimmer3BLEAndroid(
                     },
                 )
             } ?: run {
-                // No real device, use simulation
                 mIsStreaming = true
                 processStateChange(ShimmerBluetooth.BtState.STREAMING)
                 processNotificationMessage(NOTIFICATION_SHIMMER_START_STREAMING)
@@ -301,7 +290,6 @@ class Shimmer3BLEAndroid(
 
         try {
             mBleDevice?.let { device ->
-                // Send stop streaming command
                 val command = byteArrayOf(STOP_STREAMING_COMMAND)
                 BleManager.getInstance().write(
                     device,
@@ -380,7 +368,6 @@ class Shimmer3BLEAndroid(
     private fun processIncomingData(data: ByteArray) {
         mDataQueue.offer(data)
 
-        // Process data in background
         mDataProcessingJob =
             mDataProcessingScope?.launch {
                 while (mDataQueue.isNotEmpty()) {
@@ -397,10 +384,8 @@ class Shimmer3BLEAndroid(
                 return
             }
 
-            // Parse Shimmer3 data packet format
             var offset = 0
 
-            // Extract timestamp (3 bytes, little-endian)
             val timestamp =
                 (
                     (packet[offset].toInt() and 0xFF) or
@@ -409,15 +394,13 @@ class Shimmer3BLEAndroid(
                     ).toLong()
             offset += TIMESTAMP_BYTES
 
-            // Extract GSR data (2 bytes, little-endian, 12-bit ADC)
             val gsrRaw =
                 (
                     (packet[offset].toInt() and 0xFF) or
                         ((packet[offset + 1].toInt() and 0xFF) shl 8)
-                    ) and 0x0FFF // Mask to 12-bit
+                    ) and 0x0FFF
             offset += GSR_BYTES
 
-            // Extract PPG data (2 bytes, little-endian)
             val ppgRaw =
                 (
                     (packet[offset].toInt() and 0xFF) or
@@ -425,10 +408,8 @@ class Shimmer3BLEAndroid(
                     ) and 0x0FFF
             offset += PPG_BYTES
 
-            // Create ObjectCluster with parsed data
             val objectCluster = ObjectCluster()
 
-            // Add timestamp
             val timestampCal = timestamp.toDouble()
             objectCluster.addData(
                 Configuration.Shimmer3.ObjectClusterSensorName.TIMESTAMP,
@@ -443,19 +424,15 @@ class Shimmer3BLEAndroid(
             objectCluster.addData("GSR", "RAW", "no units", gsrRaw.toDouble())
             objectCluster.addData("GSR", "CAL", "µS", gsrConductance)
 
-            // Add PPG data
             objectCluster.addData("PPG", "RAW", "no units", ppgRaw.toDouble())
             objectCluster.addData("PPG", "CAL", "no units", ppgRaw.toDouble())
 
-            // Set device address
             objectCluster.setBluetoothAddress(mBluetoothAddress)
 
-            // Send to handler
             processDataPacket(objectCluster)
 
             mSampleCount++
 
-            // Log periodically for monitoring
             if (mSampleCount % 128 == 0L) {
                 Log.d(TAG, "Data: GSR=$gsrRaw(${String.format("%.2f", gsrConductance)}µS), PPG=$ppgRaw")
             }
@@ -465,10 +442,9 @@ class Shimmer3BLEAndroid(
     }
 
     private fun convertGSRToMicrosiemens(rawAdc: Int): Double {
-        // Shimmer3 GSR+ calibration with 12-bit ADC (0-4095)
         val voltage = (rawAdc.toDouble() / 4095.0) * 3.0 // 3V reference
-        val resistance = (voltage * 40200.0) / (3.0 - voltage) // Series resistance
-        return if (resistance > 0) 1000000.0 / resistance else 0.1 // Convert to microsiemens
+        val resistance = (voltage * 40200.0) / (3.0 - voltage)
+        return if (resistance > 0) 1000000.0 / resistance else 0.1
     }
 
     private fun startSimulationMode() {
@@ -481,20 +457,16 @@ class Shimmer3BLEAndroid(
 
                 while (isActive && mIsConnected) {
                     try {
-                        // Generate realistic GSR data
-                        val baseGSR = 8.0 + 3.0 * sin(sampleCounter * 0.01) // Slow drift
-                        val noise = (Random.nextDouble() - 0.5) * 0.5 // Small random noise
+                        val baseGSR = 8.0 + 3.0 * sin(sampleCounter * 0.01)
+                        val noise = (Random.nextDouble() - 0.5) * 0.5
                         val gsrMicrosiemens = (baseGSR + noise).coerceAtLeast(0.1)
 
-                        // Convert back to raw ADC for realistic simulation
                         val resistance = 1000000.0 / gsrMicrosiemens
                         val voltage = (resistance * 3.0) / (resistance + 40200.0)
                         val gsrRaw = ((voltage / 3.0) * 4095.0).toInt().coerceIn(0, 4095)
 
-                        // Generate PPG data
                         val ppgRaw = (2000 + 500 * sin(sampleCounter * 0.1)).toInt().coerceIn(0, 4095)
 
-                        // Create ObjectCluster
                         val objectCluster = ObjectCluster()
                         val timestamp = System.currentTimeMillis().toDouble()
 
@@ -512,7 +484,6 @@ class Shimmer3BLEAndroid(
 
                         objectCluster.setBluetoothAddress(mBluetoothAddress)
 
-                        // Send data if streaming
                         if (mIsStreaming) {
                             processDataPacket(objectCluster)
                         }

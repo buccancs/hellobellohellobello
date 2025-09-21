@@ -13,7 +13,7 @@ import android.os.IBinder
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
-// R import handled automatically
+import com.yourcompany.sensorspoke.R
 import com.yourcompany.sensorspoke.controller.RecordingController
 import com.yourcompany.sensorspoke.network.ConnectionManager
 import com.yourcompany.sensorspoke.network.FileTransferManager
@@ -59,14 +59,11 @@ class RecordingService : Service() {
     private val clientWriters = Collections.synchronizedList(mutableListOf<BufferedWriter>())
     private var previewListener: ((ByteArray, Long) -> Unit)? = null
 
-    // Phase 3: Advanced networking components
     private var timeSyncService: TimeSyncService? = null
     private var connectionManager: ConnectionManager? = null
 
-    // Enhanced recording controller and sensor integration
     private var recordingController: RecordingController? = null
 
-    // FR8: track current session state to support rejoin notification
     private var currentSessionId: String? = null
     private var isRecording: Boolean = false
 
@@ -74,24 +71,19 @@ class RecordingService : Service() {
         super.onCreate()
         networkClient = NetworkClient(applicationContext)
 
-        // Initialize RecordingController and sensor recorders
         initializeRecordingSystem()
 
-        // Phase 3: Initialize advanced networking components
         timeSyncService = TimeSyncService(applicationContext)
         connectionManager = ConnectionManager(applicationContext, networkClient).apply {
             onConnectionEstablished = { address, port ->
-                // Start time synchronization when connection is established
-                timeSyncService?.startSync(address, 8081) // Default time server port
+                timeSyncService?.startSync(address, 8081)
             }
             onConnectionLost = {
-                // Stop time sync on connection loss
                 timeSyncService?.stopSync()
             }
         }
 
         startInForeground()
-        // Subscribe to preview frames and forward to connected clients
         previewListener = { bytes, ts -> broadcastPreviewFrame(bytes, ts) }
         previewListener?.let { PreviewBus.subscribe(it) }
         scope.launch { startServerAndAdvertise() }
@@ -102,7 +94,6 @@ class RecordingService : Service() {
         flags: Int,
         startId: Int,
     ): Int {
-        // Keep running until explicitly stopped
         return START_STICKY
     }
 
@@ -117,11 +108,9 @@ class RecordingService : Service() {
         } catch (_: Exception) {
         }
 
-        // Phase 3: Cleanup advanced networking components
         timeSyncService?.cleanup()
         connectionManager?.cleanup()
 
-        // Cleanup recording system
         cleanupRecordingSystem()
 
         previewListener?.let { PreviewBus.unsubscribe(it) }
@@ -134,12 +123,8 @@ class RecordingService : Service() {
      */
     private fun initializeRecordingSystem() {
         try {
-            // Initialize RecordingController
             recordingController = RecordingController(applicationContext)
 
-            // For now, use stub recorders in the service context to avoid lifecycle issues
-            // The actual sensor integration will be handled by the MainActivity
-            // This service focuses on network coordination and session management
 
             Log.i("RecordingService", "Recording system initialized for network coordination")
         } catch (e: Exception) {
@@ -152,8 +137,6 @@ class RecordingService : Service() {
      */
     private fun cleanupRecordingSystem() {
         try {
-            // The actual recording cleanup is handled by MainActivity
-            // This service just coordinates network communication
             recordingController = null
 
             Log.i("RecordingService", "Recording system cleaned up")
@@ -182,14 +165,14 @@ class RecordingService : Service() {
                 .Builder(this, channelId)
                 .setContentTitle(getString(R.string.notification_title))
                 .setContentText(getString(R.string.notification_text))
-                .setSmallIcon(R.drawable.ic_notification_recording) // Use proper recording icon
+                .setSmallIcon(R.drawable.ic_notification_recording)
                 .setOngoing(true)
                 .build()
         startForeground(1001, notification)
     }
 
     private suspend fun startServerAndAdvertise() {
-        serverSocket = ServerSocket(0) // auto-assign free port
+        serverSocket = ServerSocket(0)
         serverPort = serverSocket!!.localPort
         networkClient.register("_gsr-controller._tcp.", "SensorSpoke - ${Build.MODEL}", serverPort)
 
@@ -198,7 +181,6 @@ class RecordingService : Service() {
                 val socket = serverSocket!!.accept()
                 scope.launch { handleConnection(socket) }
             } catch (_: Exception) {
-                // Socket closed or error; exit loop on service stop
                 break
             }
         }
@@ -208,9 +190,7 @@ class RecordingService : Service() {
         socket.use { s ->
             val bis = BufferedInputStream(s.getInputStream(), 8192)
             val writer = BufferedWriter(OutputStreamWriter(s.getOutputStream()))
-            // Track this client for preview broadcasting
             clientWriters.add(writer)
-            // FR8: On new connection, notify PC of current or last session
             maybeSendRejoin(writer)
             try {
                 while (true) {
@@ -236,7 +216,6 @@ class RecordingService : Service() {
                         }
 
                         "time_sync" -> {
-                            // PC sent t0; record t1 on arrival and reply immediately with t1 and t2
                             val t1 = System.nanoTime()
                             val t2 = System.nanoTime()
                             val response =
@@ -256,17 +235,14 @@ class RecordingService : Service() {
                         "start_recording" -> {
                             val sessionId = obj.optString("session_id", "")
 
-                            // Forward to UI via broadcast - the MainActivity will handle actual recording with sensors
                             val intent = Intent(ACTION_START_RECORDING)
                                 .putExtra(EXTRA_SESSION_ID, sessionId)
                                 .setPackage("com.yourcompany.sensorspoke")
                             sendBroadcast(intent)
 
-                            // FR8: update local session state for rejoin purposes
                             if (sessionId.isNotEmpty()) currentSessionId = sessionId
                             isRecording = true
 
-                            // Update notification to show recording status
                             updateNotificationForRecording(currentSessionId)
 
                             val response = JSONObject().put("ack_id", id).put("status", "ok")
@@ -282,15 +258,12 @@ class RecordingService : Service() {
                         }
 
                         "stop_recording" -> {
-                            // Forward to UI via broadcast - the MainActivity will handle actual stopping
                             val intent = Intent(ACTION_STOP_RECORDING)
                                 .setPackage("com.yourcompany.sensorspoke")
                             sendBroadcast(intent)
 
-                            // FR8: update local session state — session ended but keep id for rejoin-triggered transfer
                             isRecording = false
 
-                            // Update notification to show idle status
                             updateNotificationForIdle()
 
                             val response = JSONObject().put("ack_id", id).put("status", "ok")
@@ -310,7 +283,7 @@ class RecordingService : Service() {
                             val intent =
                                 Intent(ACTION_FLASH_SYNC)
                                     .putExtra(EXTRA_FLASH_TS_NS, ts)
-                                    .setPackage("com.yourcompany.sensorspoke") // Fix lint: UnsafeImplicitIntentLaunch
+                                    .setPackage("com.yourcompany.sensorspoke")
                             sendBroadcast(intent)
                             val response = JSONObject().put("ack_id", id).put("status", "ok").put("ts", ts)
                             if (isV1) {
@@ -326,7 +299,6 @@ class RecordingService : Service() {
                             val port = obj.optInt("port", -1)
                             val sessionId = obj.optString("session_id", "")
                             if (host.isNotEmpty() && port > 0 && sessionId.isNotEmpty()) {
-                                // Start transfer asynchronously
                                 scope.launch {
                                     runCatching {
                                         val ftm = FileTransferManager(applicationContext)
@@ -356,7 +328,6 @@ class RecordingService : Service() {
                         }
 
                         else -> {
-                            // Unknown commands acknowledged as error
                             val response =
                                 JSONObject()
                                     .put("ack_id", id)
@@ -372,7 +343,6 @@ class RecordingService : Service() {
                     }
                 }
             } catch (_: Exception) {
-                // swallow errors but keep service alive
             } finally {
                 try {
                     writer.flush()
@@ -394,7 +364,6 @@ class RecordingService : Service() {
                 writer.flush()
             }
         } catch (_: Exception) {
-            // ignore write errors; connection handler will close
         }
     }
 
@@ -412,11 +381,9 @@ class RecordingService : Service() {
                 writer.flush()
             }
         } catch (_: Exception) {
-            // ignore write errors; connection handler will close
         }
     }
 
-    // FR8 helper: notify PC of current or last session upon connection
     private fun maybeSendRejoin(writer: BufferedWriter) {
         val sid = currentSessionId
         if (sid.isNullOrEmpty()) return
@@ -435,11 +402,9 @@ class RecordingService : Service() {
     }
 
     private fun readJsonFromSocket(bis: BufferedInputStream): String? {
-        // Read first line
         val first = readAsciiLine(bis) ?: return null
         val isDigits = first.isNotEmpty() && first.all { it in '0'..'9' }
         return if (isDigits) {
-            // length-prefixed payload follows
             val length =
                 try {
                     first.toInt()
@@ -455,7 +420,6 @@ class RecordingService : Service() {
             }
             String(buf, Charsets.UTF_8)
         } else {
-            // legacy newline-delimited JSON
             first
         }
     }
@@ -500,7 +464,6 @@ class RecordingService : Service() {
         result.put("android_release", Build.VERSION.RELEASE ?: "")
         result.put("service_port", serverPort)
 
-        // Enhanced sensor availability reporting
         val controller = recordingController
         if (controller != null) {
             val sensorStatus = controller.getSensorStatusReport()
@@ -509,7 +472,6 @@ class RecordingService : Service() {
             result.put("has_gsr", sensorStatus.containsKey("gsr"))
             result.put("sensor_status", JSONObject(sensorStatus))
         } else {
-            // Fallback to basic capability reporting
             result.put("has_rgb", true)
             result.put("has_thermal", true)
             result.put("has_gsr", true)
@@ -531,7 +493,6 @@ class RecordingService : Service() {
                 cameras.put(JSONObject().put("id", id).put("facing", facing))
             }
         } catch (_: Exception) {
-            // ignore camera errors
         }
         result.put("cameras", cameras)
         return result
@@ -551,7 +512,7 @@ class RecordingService : Service() {
                 .setContentText("Session: ${sessionId ?: "Unknown"}")
                 .setSmallIcon(R.drawable.ic_notification_recording)
                 .setOngoing(true)
-                .setProgress(0, 0, true) // Indeterminate progress
+                .setProgress(0, 0, true)
                 .build()
 
         nm.notify(1001, notification)

@@ -23,11 +23,9 @@ import java.util.concurrent.TimeUnit
  */
 class MainViewModel : ViewModel() {
 
-    // Main UI state - comprehensive state for all UI elements
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    // Recording state management
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
@@ -37,14 +35,12 @@ class MainViewModel : ViewModel() {
     private val _recordingState = MutableStateFlow(RecordingState.IDLE)
     val recordingState: StateFlow<RecordingState> = _recordingState.asStateFlow()
 
-    // Recording timing
     private val _recordingStartTime = MutableStateFlow(0L)
     val recordingStartTime: StateFlow<Long> = _recordingStartTime.asStateFlow()
 
     private val _recordingElapsedTime = MutableStateFlow(0L)
     val recordingElapsedTime: StateFlow<Long> = _recordingElapsedTime.asStateFlow()
 
-    // UI state management
     private val _statusMessage = MutableStateFlow("Ready")
     val statusMessage: StateFlow<String> = _statusMessage.asStateFlow()
 
@@ -54,14 +50,11 @@ class MainViewModel : ViewModel() {
     private val _showErrorDialog = MutableStateFlow(false)
     val showErrorDialog: StateFlow<Boolean> = _showErrorDialog.asStateFlow()
 
-    // Sensor status tracking
     private val _sensorStatus = MutableStateFlow<Map<String, SensorStatus>>(emptyMap())
     val sensorStatus: StateFlow<Map<String, SensorStatus>> = _sensorStatus.asStateFlow()
 
-    // Connection management
     private var connectionManager: ConnectionManager? = null
 
-    // RecordingController coordination - using SessionOrchestrator interface
     private var sessionOrchestrator: SessionOrchestrator? = null
 
     enum class RecordingState {
@@ -89,30 +82,25 @@ class MainViewModel : ViewModel() {
      * Comprehensive UI state data class
      */
     data class MainUiState(
-        // Sensor connection states
         val isCameraConnected: Boolean = false,
         val isThermalConnected: Boolean = false,
         val isShimmerConnected: Boolean = false,
         val isPcConnected: Boolean = false,
 
-        // Recording state
         val isRecording: Boolean = false,
         val isInitialized: Boolean = false,
         val recordingElapsedTime: String = "00:00",
 
-        // Status and messages
         val statusText: String = "Initializing...",
         val errorMessage: String? = null,
         val showErrorDialog: Boolean = false,
 
-        // Thermal camera specific
         val thermalStatus: ThermalStatus = ThermalStatus(),
+        val sensorStatus: Map<String, SensorStatus> = emptyMap(),
 
-        // Button states
         val startButtonEnabled: Boolean = false,
         val stopButtonEnabled: Boolean = false,
 
-        // Preview availability
         val rgbPreviewAvailable: Boolean = false,
         val thermalPreviewAvailable: Boolean = false,
     )
@@ -134,10 +122,8 @@ class MainViewModel : ViewModel() {
         sessionOrchestrator = orchestrator
         connectionManager = connManager
 
-        // Initialize UI state
-        updateUiState { it.copy(isInitialized = true, statusText = "Ready to connect") }
+        updateUiState { copy(isInitialized = true, statusText = "Ready to connect") }
 
-        // Observe orchestrator state changes
         viewModelScope.launch {
             orchestrator.state.collect { orchestratorState ->
                 val newRecordingState = when (orchestratorState) {
@@ -164,7 +150,6 @@ class MainViewModel : ViewModel() {
                     )
                 }
 
-                // Handle recording timing
                 if (orchestratorState == SessionOrchestrator.State.RECORDING) {
                     startRecordingTimer()
                 } else {
@@ -173,16 +158,14 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // Observe current session
         viewModelScope.launch {
             orchestrator.currentSessionId.collect { sessionId ->
-                updateUiState { it.copy(currentSessionId = sessionId) }
+                updateUiState { copy(statusText = if (sessionId != null) "Session: $sessionId" else "Ready") }
             }
         }
 
         // If orchestrator is RecordingController, observe additional features
         if (orchestrator is com.yourcompany.sensorspoke.controller.RecordingController) {
-            // Observe sensor states
             viewModelScope.launch {
                 orchestrator.sensorStates.collect { sensorStates ->
                     val statusMap = sensorStates.mapValues { (sensorName, state) ->
@@ -195,14 +178,26 @@ class MainViewModel : ViewModel() {
                             com.yourcompany.sensorspoke.controller.RecordingController.RecorderState.STOPPING -> "Stopping..."
                             com.yourcompany.sensorspoke.controller.RecordingController.RecorderState.STOPPED -> "Stopped"
                             com.yourcompany.sensorspoke.controller.RecordingController.RecorderState.ERROR -> "Error"
+                            com.yourcompany.sensorspoke.controller.RecordingController.RecorderState.RECOVERING -> "Recovering..."
                         }
-                        SensorStatus(sensorName, isActive, isHealthy, System.currentTimeMillis(), statusMessage)
+                        // Determine if sensor is simulated based on recorder type and state
+                        val isSimulated = when (sensorName.lowercase()) {
+                            "thermal" -> {
+                                // Check if thermal is simulated from thermal status
+                                _uiState.value.thermalStatus.isSimulated
+                            }
+                            else -> false // Other sensors are not typically simulated in this system
+                        }
+                        
+                        SensorStatus(sensorName, isActive, isHealthy, isSimulated, System.currentTimeMillis(), statusMessage)
                     }
                     _sensorStatus.value = statusMap
+                    
+                    // Update UI state with sensor status
+                    updateUiState { copy(sensorStatus = statusMap) }
                 }
             }
 
-            // Observe session start results for partial failure notifications
             viewModelScope.launch {
                 orchestrator.lastSessionResult.collect { result ->
                     result?.let {
@@ -212,17 +207,11 @@ class MainViewModel : ViewModel() {
                         }
                     }
                 }
-
-                updateUiState {
-                    copy(statusText = if (sessionId != null) "Session: $sessionId" else "Ready")
-                }
             }
         }
 
-        // Initialize connection monitoring if available
         connManager?.let { setupConnectionMonitoring(it) }
 
-        // Initialize sensor status
         initializeSensorStatus()
     }
 
@@ -231,7 +220,6 @@ class MainViewModel : ViewModel() {
      */
     private fun setupConnectionMonitoring(connManager: ConnectionManager) {
         viewModelScope.launch {
-            // Poll connection status periodically
             while (true) {
                 val status = connManager.getConnectionStatus()
                 updateUiState {
@@ -246,7 +234,7 @@ class MainViewModel : ViewModel() {
                         },
                     )
                 }
-                kotlinx.coroutines.delay(2000) // Check every 2 seconds
+                kotlinx.coroutines.delay(2000)
             }
         }
     }
@@ -292,7 +280,7 @@ class MainViewModel : ViewModel() {
                     copy(recordingElapsedTime = timeString)
                 }
 
-                kotlinx.coroutines.delay(1000) // Update every second
+                kotlinx.coroutines.delay(1000)
             }
         }
     }
@@ -358,7 +346,6 @@ class MainViewModel : ViewModel() {
         currentStatus[sensorName] = status
         _sensorStatus.value = currentStatus
 
-        // Update main UI state based on sensor status
         updateUiState {
             copy(
                 isCameraConnected = currentStatus["rgb"]?.isActive == true,
@@ -393,7 +380,6 @@ class MainViewModel : ViewModel() {
      * Show toast message (handled by Activity)
      */
     fun showToast(message: String) {
-        // This will be observed by the Activity to show toast
         updateUiState {
             copy(statusText = message)
         }
@@ -431,7 +417,6 @@ class MainViewModel : ViewModel() {
             )
         }
 
-        // Also update in sensor status
         updateSensorStatus(
             "thermal",
             SensorStatus(
@@ -518,6 +503,5 @@ class MainViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        // Clean up any resources if needed
     }
 }

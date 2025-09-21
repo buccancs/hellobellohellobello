@@ -5,7 +5,7 @@ import android.view.View
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
-// R import handled automatically
+import com.yourcompany.sensorspoke.R
 
 /**
  * DelPopup - Device deletion popup inspired by IRCamera
@@ -22,7 +22,6 @@ class DelPopup(
     }
 
     private fun setupPopup() {
-        // Create popup content programmatically since we don't have the exact layout
         val layout =
             ConstraintLayout(context).apply {
                 layoutParams =

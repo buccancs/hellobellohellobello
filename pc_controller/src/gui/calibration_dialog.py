@@ -37,11 +37,13 @@ from pc_controller.src.tools.camera_calibration import (
 class CalibrationWorker(QObject):
     """Worker thread for performing camera calibration without blocking UI."""
 
-    progress = pyqtSignal(str)  # Progress messages
-    finished = pyqtSignal(object)  # CalibrationResult or None
-    error = pyqtSignal(str)  # Error message
+    progress = pyqtSignal(str)
+    finished = pyqtSignal(object)
+    error = pyqtSignal(str)
 
-    def __init__(self, image_paths: list[str], board_size: tuple[int, int], square_size: float):
+    def __init__(
+        self, image_paths: list[str], board_size: tuple[int, int], square_size: float
+    ):
         super().__init__()
         self.image_paths = image_paths
         self.board_size = board_size
@@ -53,14 +55,15 @@ class CalibrationWorker(QObject):
             self.progress.emit("Starting camera calibration...")
             self.progress.emit(f"Processing {len(self.image_paths)} images...")
 
-            # Perform the actual calibration
             result = calibrate_camera(
                 image_paths=self.image_paths,
                 board_size=self.board_size,
-                square_size=self.square_size
+                square_size=self.square_size,
             )
 
-            self.progress.emit(f"Calibration complete! RMS error: {result.rms_error:.4f}")
+            self.progress.emit(
+                f"Calibration complete! RMS error: {result.rms_error:.4f}"
+            )
             self.finished.emit(result)
 
         except Exception as e:
@@ -85,12 +88,13 @@ class CalibrationDialog(QDialog):
         """Set up the user interface."""
         layout = QVBoxLayout(self)
 
-        # Image selection group
         image_group = QGroupBox("Calibration Images")
         image_layout = QFormLayout(image_group)
 
         self.images_path_edit = QLineEdit()
-        self.images_path_edit.setPlaceholderText("Select folder containing checkerboard images...")
+        self.images_path_edit.setPlaceholderText(
+            "Select folder containing checkerboard images..."
+        )
         self.browse_button = QPushButton("Browse...")
         self.browse_button.clicked.connect(self._browse_images_folder)
 
@@ -107,7 +111,7 @@ class CalibrationDialog(QDialog):
 
         self.board_width_spin = QSpinBox()
         self.board_width_spin.setRange(3, 20)
-        self.board_width_spin.setValue(9)  # Default 9x6 checkerboard
+        self.board_width_spin.setValue(9)
 
         self.board_height_spin = QSpinBox()
         self.board_height_spin.setRange(3, 20)
@@ -115,7 +119,7 @@ class CalibrationDialog(QDialog):
 
         self.square_size_spin = QDoubleSpinBox()
         self.square_size_spin.setRange(0.001, 1.0)
-        self.square_size_spin.setValue(0.025)  # 25mm default
+        self.square_size_spin.setValue(0.025)
         self.square_size_spin.setDecimals(3)
         self.square_size_spin.setSuffix(" m")
 
@@ -124,7 +128,6 @@ class CalibrationDialog(QDialog):
         params_layout.addRow("Square Size:", self.square_size_spin)
         layout.addWidget(params_group)
 
-        # Progress group
         progress_group = QGroupBox("Calibration Progress")
         progress_layout = QVBoxLayout(progress_group)
 
@@ -139,7 +142,6 @@ class CalibrationDialog(QDialog):
         progress_layout.addWidget(self.progress_text)
         layout.addWidget(progress_group)
 
-        # Buttons
         button_layout = QHBoxLayout()
 
         self.calibrate_button = QPushButton("Start Calibration")
@@ -164,35 +166,37 @@ class CalibrationDialog(QDialog):
         folder = QFileDialog.getExistingDirectory(
             self,
             "Select Calibration Images Folder",
-            self.images_path_edit.text() or os.path.expanduser("~")
+            self.images_path_edit.text() or os.path.expanduser("~"),
         )
         if folder:
             self.images_path_edit.setText(folder)
 
     def _start_calibration(self):
         """Start the calibration process."""
-        # Validate inputs
         images_folder = self.images_path_edit.text().strip()
         if not images_folder or not Path(images_folder).is_dir():
-            QMessageBox.warning(self, "Input Error", "Please select a valid images folder.")
+            QMessageBox.warning(
+                self, "Input Error", "Please select a valid images folder."
+            )
             return
 
-        # Find image files
-        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff"}
         image_files = [
-            str(p) for p in Path(images_folder).iterdir()
+            str(p)
+            for p in Path(images_folder).iterdir()
             if p.is_file() and p.suffix.lower() in image_extensions
         ]
 
         if not image_files:
-            QMessageBox.warning(self, "Input Error", "No image files found in the selected folder.")
+            QMessageBox.warning(
+                self, "Input Error", "No image files found in the selected folder."
+            )
             return
 
         # Get parameters
         board_size = (self.board_width_spin.value(), self.board_height_spin.value())
         square_size = self.square_size_spin.value()
 
-        # Start calibration in background thread
         self._log_progress(f"Found {len(image_files)} images for calibration")
         self._log_progress(
             f"Board size: {board_size[0]}x{board_size[1]}, square size: {square_size}m"
@@ -200,20 +204,17 @@ class CalibrationDialog(QDialog):
 
         self.calibrate_button.setEnabled(False)
         self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.progress_bar.setRange(0, 0)
 
-        # Create worker thread
         self.worker = CalibrationWorker(image_files, board_size, square_size)
         self.worker_thread = QThread()
         self.worker.moveToThread(self.worker_thread)
 
-        # Connect signals
         self.worker.progress.connect(self._log_progress)
         self.worker.finished.connect(self._calibration_finished)
         self.worker.error.connect(self._calibration_error)
         self.worker_thread.started.connect(self.worker.run)
 
-        # Start the thread
         self.worker_thread.start()
 
     def _log_progress(self, message: str):
@@ -224,16 +225,17 @@ class CalibrationDialog(QDialog):
         """Handle successful calibration completion."""
         self.calibration_result = result
 
-        # Show results
         self._log_progress("=" * 50)
         self._log_progress("CALIBRATION RESULTS:")
         self._log_progress(f"RMS Reprojection Error: {result.rms_error:.4f} pixels")
         self._log_progress(f"Image Size: {result.image_size[0]}x{result.image_size[1]}")
         self._log_progress("Camera Matrix:")
         for i in range(3):
-            row_str = "  [" + ", ".join(
-                f"{result.camera_matrix[i, j]:8.3f}" for j in range(3)
-            ) + "]"
+            row_str = (
+                "  ["
+                + ", ".join(f"{result.camera_matrix[i, j]:8.3f}" for j in range(3))
+                + "]"
+            )
             self._log_progress(row_str)
         self._log_progress(f"Distortion Coefficients: {result.dist_coeffs.flatten()}")
 
@@ -267,16 +269,20 @@ class CalibrationDialog(QDialog):
             self,
             "Save Calibration Results",
             "camera_calibration.json",
-            "JSON files (*.json)"
+            "JSON files (*.json)",
         )
 
         if filename:
             try:
                 save_calibration(filename, self.calibration_result)
-                QMessageBox.information(self, "Success", f"Calibration saved to:\n{filename}")
+                QMessageBox.information(
+                    self, "Success", f"Calibration saved to:\n{filename}"
+                )
                 self._log_progress(f"Results saved to: {filename}")
             except Exception as e:
-                QMessageBox.critical(self, "Save Error", f"Failed to save calibration:\n{e!s}")
+                QMessageBox.critical(
+                    self, "Save Error", f"Failed to save calibration:\n{e!s}"
+                )
 
     def closeEvent(self, event):
         """Handle dialog close event."""
@@ -286,7 +292,7 @@ class CalibrationDialog(QDialog):
                 "Calibration Running",
                 "Calibration is still running. Do you want to cancel it and close?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.No,
             )
 
             if reply == QMessageBox.StandardButton.Yes:

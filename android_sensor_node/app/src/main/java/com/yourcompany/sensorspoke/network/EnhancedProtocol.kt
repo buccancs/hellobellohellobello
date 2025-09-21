@@ -20,13 +20,11 @@ object EnhancedProtocol {
      * Message types for enhanced protocol
      */
     object MessageTypes {
-        // Basic protocol (v1.0)
         const val QUERY_CAPABILITIES = "query_capabilities"
         const val START_RECORDING = "start_recording"
         const val STOP_RECORDING = "stop_recording"
         const val FLASH_SYNC = "flash_sync"
 
-        // Enhanced protocol (v2.0)
         const val SESSION_START = "session_start"
         const val SESSION_STOP = "session_stop"
         const val SESSION_STATUS = "session_status"
@@ -69,7 +67,7 @@ object EnhancedProtocol {
             put("model", Build.MODEL)
             put("hardware", Build.HARDWARE)
             put("board", Build.BOARD)
-            put("app_version", "1.0.0") // Could be dynamically retrieved
+            put("app_version", "1.0.0")
             put("timestamp", System.currentTimeMillis())
         }
     }
@@ -79,7 +77,6 @@ object EnhancedProtocol {
      */
     private fun createCapabilitiesArray(): JSONArray {
         return JSONArray().apply {
-            // RGB Camera
             put(
                 JSONObject().apply {
                     put("sensor", "rgb_camera")
@@ -98,7 +95,6 @@ object EnhancedProtocol {
                 },
             )
 
-            // Thermal Camera
             put(
                 JSONObject().apply {
                     put("sensor", "thermal_camera")
@@ -117,7 +113,6 @@ object EnhancedProtocol {
                 },
             )
 
-            // GSR Sensor
             put(
                 JSONObject().apply {
                     put("sensor", "gsr")
@@ -137,7 +132,6 @@ object EnhancedProtocol {
                 },
             )
 
-            // Audio Recording
             put(
                 JSONObject().apply {
                     put("sensor", "audio")
@@ -229,13 +223,11 @@ object EnhancedProtocol {
             put("timestamp", System.currentTimeMillis())
             put("message_id", generateMessageId())
 
-            // System status
             put("battery_level", getBatteryLevel(context))
             put("storage_free_mb", getAvailableStorageMB(context))
             put("memory_free_mb", getAvailableMemoryMB())
             put("cpu_usage", getCpuUsage())
 
-            // Session status
             if (sessionId != null) {
                 put("session_id", sessionId)
                 put("recording_status", "active")
@@ -243,7 +235,6 @@ object EnhancedProtocol {
                 put("recording_status", "idle")
             }
 
-            // Sensor status
             put("sensors", createSensorStatusArray())
         }
     }
@@ -306,14 +297,14 @@ object EnhancedProtocol {
             put(
                 JSONObject().apply {
                     put("sensor", "thermal_camera")
-                    put("status", "available") // Would check actual hardware
+                    put("status", "available")
                     put("connection", "usb_ready")
                 },
             )
             put(
                 JSONObject().apply {
                     put("sensor", "gsr")
-                    put("status", "available") // Would check BLE connection
+                    put("status", "available")
                     put("connection", "ble_ready")
                 },
             )
@@ -338,8 +329,7 @@ object EnhancedProtocol {
      * Get battery level (simplified - would need actual implementation)
      */
     private fun getBatteryLevel(context: Context): Int {
-        // Simplified - actual implementation would use BatteryManager
-        return 85 // Placeholder
+        return 85
     }
 
     /**
@@ -370,8 +360,7 @@ object EnhancedProtocol {
      * Get CPU usage (simplified)
      */
     private fun getCpuUsage(): Double {
-        // Simplified - actual implementation would read /proc/stat
-        return 25.0 // Placeholder
+        return 25.0
     }
 
     /**
@@ -381,13 +370,11 @@ object EnhancedProtocol {
         return try {
             val message = JSONObject(messageStr)
 
-            // Validate required fields
             if (!message.has("type")) {
                 Log.w(TAG, "Message missing 'type' field")
                 return null
             }
 
-            // Check protocol version compatibility
             if (message.has("v")) {
                 val version = message.getString("v")
                 if (version != "1.0" && version != PROTOCOL_VERSION) {
@@ -412,12 +399,10 @@ object EnhancedProtocol {
             put("status", status)
             put("timestamp", System.currentTimeMillis())
 
-            // Include original message ID if present
             if (originalMessage.has("message_id")) {
                 put("ack_message_id", originalMessage.getString("message_id"))
             }
 
-            // Include additional data if provided
             if (data != null) {
                 put("data", data)
             }

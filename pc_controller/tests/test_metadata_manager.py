@@ -186,7 +186,6 @@ class TestSessionMetadataManager:
         """Test saving and loading metadata to/from JSON."""
         self.manager.create_session_metadata("participant_001", "test_session")
 
-        # Add some data
         device = DeviceInfo(
             device_id="device_001",
             device_type="android",
@@ -199,15 +198,12 @@ class TestSessionMetadataManager:
         )
         self.manager.add_device("test_session", device)
 
-        # Save metadata
         result = self.manager.save_metadata("test_session")
         assert result is True
 
-        # Check file exists
         metadata_file = Path(self.temp_dir) / "test_session" / "metadata.json"
         assert metadata_file.exists()
 
-        # Load metadata
         loaded_metadata = self.manager.load_metadata("test_session")
         assert loaded_metadata is not None
         assert loaded_metadata.session_id == "test_session"
@@ -230,7 +226,6 @@ class TestSessionMetadataManager:
         assert "timestamp_ns" in thermal_schema
         assert "w" in thermal_schema
         assert "h" in thermal_schema
-        # Check some pixel values
         assert "v0" in thermal_schema
         assert "v1000" in thermal_schema
 
@@ -249,18 +244,14 @@ class TestSessionMetadataManager:
         anon_id2 = self.manager._anonymize_participant_id("participant_001")
         anon_id3 = self.manager._anonymize_participant_id("participant_002")
 
-        # Same input should give same output
         assert anon_id1 == anon_id2
-        # Different input should give different output
         assert anon_id1 != anon_id3
-        # Should start with P_
         assert anon_id1.startswith("P_")
 
     def test_get_session_summary(self):
         """Test getting session summary."""
         self.manager.create_session_metadata("participant_001", "test_session")
 
-        # Add some data
         device = DeviceInfo(
             device_id="device_001",
             device_type="android",

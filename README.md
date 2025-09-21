@@ -1,3 +1,5 @@
+[![Copilot](https://github.com/uclgsr/hellobellohellobello/actions/workflows/copilot-swe-agent/copilot/badge.svg)](https://github.com/uclgsr/hellobellohellobello/actions/workflows/copilot-swe-agent/copilot)
+
 # Multi-Modal Physiological Sensing Platform
 
 This repository contains a hub-and-spoke research platform for synchronous, multi-modal data collection with **production-ready hardware integration**.
@@ -7,15 +9,19 @@ This repository contains a hub-and-spoke research platform for synchronous, mult
   PyBind11).
 - Spoke (Android Sensor Node, Kotlin/Android): Mobile client with **true SDK integration** for hardware (RGB cameras, Topdon TC001 thermal camera, Shimmer GSR sensors), featuring calibrated thermal sensing and production-ready data recording, communicating with the Hub over a secured TCP/IP socket.
 
-See docs/System_Design.md for architecture overview and docs/Implementation_Phases.md for implementation details.
+See documentation/System_Design.md for architecture overview and documentation/Implementation_Phases.md for implementation details.
 
 ## Project Structure
 
-- pc_controller/ — Python sources, native backend (C++), tests, and Gradle tasks for Python workflows
-- android_sensor_node/ — Android application (MVVM) with **production-ready SDK integration**: CameraX RGB, **true Topdon TC001 SDK integration** (±2°C thermal accuracy), and **real Shimmer GSR SDK** with 12-bit ADC precision
-- docs/ — User and developer documentation, protocol, validation guides, and LaTeX sources
-  - docs/diagrams/ — **NEW**: Comprehensive system documentation diagrams and artifacts
-- scripts/ — Utility scripts (e.g., backup_script.py)
+- **pc_controller/** — Python sources, native backend (C++), tests, and Gradle tasks for Python workflows
+- **android_sensor_node/** — Android application (MVVM) with **production-ready SDK integration**: CameraX RGB, **true Topdon TC001 SDK integration** (±2°C thermal accuracy), and **real Shimmer GSR SDK** with 12-bit ADC precision
+- **documentation/** — All project documentation, protocol guides, validation evidence, and LaTeX thesis sources
+  - documentation/diagrams/ — Comprehensive system documentation diagrams and artifacts
+  - documentation/phases/ — Development phase documentation and implementation summaries
+  - documentation/architecture/ — Technical architecture, protocols, and integration guides
+  - documentation/development/ — Development processes, testing pipelines, and quality assurance
+- **demos/** — Feature demonstrations, GUI visualizations, and system integration examples
+- **tools/** — Development utilities, analysis scripts, and build automation
 
 ## Prerequisites
 
@@ -66,7 +72,7 @@ To run from sources (development):
 - Android records locally per session (RGB MP4 + FR5 JPEGs, thermal CSV, GSR CSV). On stop, the device can transfer a
   ZIP of the session to the Hub over TCP.
 - On PC, DataLoader and HDF5 exporter utilities aggregate and export into a research-ready HDF5 file.
-- Backup strategy and automation: see docs/BACKUP_STRATEGY.md and scripts/backup_script.py.
+- Backup strategy and automation: see documentation/BACKUP_STRATEGY.md and tools/backup_script.py.
 
 ## Native Backend
 
@@ -193,12 +199,12 @@ This section provides a simple, step-by-step path for new users and examiners to
 
 ## Performance & Endurance Testing
 - Simulated load with multiple clients:
-  - python scripts/run_performance_test.py --clients 8 --rate 30 --duration 900
+  - python tools/run_performance_test.py --clients 8 --rate 30 --duration 900
   - Monitors CPU/Memory; verifies NetworkController stability under load.
 
 ## Post-Session Sync Validation
 - Validate cross-device timing (FR3/NFR2):
-  - python scripts/validate_sync.py --session-id <SESSION_ID> --base-dir ./pc_controller_data
+  - python tools/validate_sync.py --session-id <SESSION_ID> --base-dir ./pc_controller_data
   - PASS: |Δt| < 5 ms across compared streams.
 
 

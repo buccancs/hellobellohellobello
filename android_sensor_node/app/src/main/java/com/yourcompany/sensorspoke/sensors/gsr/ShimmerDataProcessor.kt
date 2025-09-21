@@ -17,18 +17,15 @@ class ShimmerDataProcessor {
     companion object {
         private const val TAG = "ShimmerDataProcessor"
 
-        // Shimmer sensor channel names
         private const val GSR_CHANNEL = "GSR"
         private const val PPG_CHANNEL = "PPG_A13"
         private const val TIMESTAMP_CHANNEL = "Timestamp"
 
-        // Data format types
         private const val RAW_FORMAT = "RAW"
         private const val CAL_FORMAT = "CAL"
 
-        // GSR conversion constants (12-bit ADC as per requirements)
-        private const val GSR_ADC_MAX = 4095.0 // 12-bit ADC maximum
-        private const val GSR_UNCAL_TO_KOHMS_FACTOR = 1000.0 // Convert to kΩ
+        private const val GSR_ADC_MAX = 4095.0
+        private const val GSR_UNCAL_TO_KOHMS_FACTOR = 1000.0
     }
 
     /**
@@ -50,15 +47,12 @@ class ShimmerDataProcessor {
      */
     fun convertObjectClusterToSensorSample(objectCluster: ObjectCluster): SensorSample? {
         return try {
-            // Extract timestamp
             val timestampNs = System.nanoTime()
             val timestampMs = System.currentTimeMillis()
 
-            // Extract GSR data - prioritize calibrated data if available
             val gsrData = extractGsrData(objectCluster)
             val ppgData = extractPpgData(objectCluster)
 
-            // Determine connection status based on ObjectCluster state
             val connectionStatus = when (objectCluster.mState) {
                 com.shimmerresearch.bluetooth.ShimmerBluetooth.BtState.CONNECTED -> "CONNECTED"
                 com.shimmerresearch.bluetooth.ShimmerBluetooth.BtState.CONNECTING -> "CONNECTING"
@@ -66,7 +60,6 @@ class ShimmerDataProcessor {
                 else -> "UNKNOWN"
             }
 
-            // Validate data integrity
             val dataIntegrity = validateDataIntegrity(gsrData, ppgData)
 
             SensorSample(
@@ -90,24 +83,20 @@ class ShimmerDataProcessor {
      */
     private fun extractGsrData(objectCluster: ObjectCluster): Pair<Double, Int> {
         return try {
-            // Try to get calibrated GSR data first
             val calibratedGsr = objectCluster.getFormatCluster(GSR_CHANNEL, CAL_FORMAT)?.mData
             val rawGsr = objectCluster.getFormatCluster(GSR_CHANNEL, RAW_FORMAT)?.mData
 
             when {
                 calibratedGsr != null && rawGsr != null -> {
-                    // Use calibrated value and raw value
                     val rawInt = rawGsr.toInt().coerceIn(0, GSR_ADC_MAX.toInt())
                     Pair(calibratedGsr, rawInt)
                 }
                 rawGsr != null -> {
-                    // Only raw data available - apply our own calibration
                     val rawInt = rawGsr.toInt().coerceIn(0, GSR_ADC_MAX.toInt())
                     val calibratedValue = convertRawGsrToKohms(rawInt)
                     Pair(calibratedValue, rawInt)
                 }
                 else -> {
-                    // No GSR data available - return defaults
                     Log.w(TAG, "No GSR data found in ObjectCluster")
                     Pair(0.0, 0)
                 }
@@ -126,7 +115,7 @@ class ShimmerDataProcessor {
             val ppgValue = objectCluster.getFormatCluster(PPG_CHANNEL, RAW_FORMAT)?.mData
                 ?: objectCluster.getFormatCluster(PPG_CHANNEL, CAL_FORMAT)?.mData
 
-            ppgValue?.toInt()?.coerceIn(0, 65535) ?: 0 // 16-bit range for PPG
+            ppgValue?.toInt()?.coerceIn(0, 65535) ?: 0
         } catch (e: Exception) {
             Log.e(TAG, "Error extracting PPG data: ${e.message}", e)
             0
@@ -138,11 +127,8 @@ class ShimmerDataProcessor {
      * This implements the critical 12-bit conversion requirement from the problem statement
      */
     private fun convertRawGsrToKohms(rawValue: Int): Double {
-        // Ensure we're working with 12-bit range (0-4095)
         val clampedRaw = rawValue.coerceIn(0, GSR_ADC_MAX.toInt())
 
-        // Convert to resistance in kΩ
-        // This is a simplified conversion - in practice, Shimmer provides calibration constants
         return (clampedRaw.toDouble() / GSR_ADC_MAX) * GSR_UNCAL_TO_KOHMS_FACTOR
     }
 
@@ -152,7 +138,7 @@ class ShimmerDataProcessor {
     private fun validateDataIntegrity(gsrData: Pair<Double, Int>, ppgData: Int): String {
         return when {
             gsrData.first <= 0.0 && gsrData.second <= 0 -> "NO_GSR_DATA"
-            gsrData.first > 10000.0 -> "GSR_OUT_OF_RANGE" // Very high resistance might indicate poor contact
+            gsrData.first > 10000.0 -> "GSR_OUT_OF_RANGE"
             ppgData <= 0 -> "NO_PPG_DATA"
             else -> "OK"
         }

@@ -72,7 +72,6 @@ class CrashRecoveryManager(
                 }
             }
 
-            // Create recovery marker to track that recovery was performed
             createRecoveryMarker(crashedSessions.size)
         } catch (e: Exception) {
             val error = "Fatal error during crash recovery: ${e.message}"
@@ -98,7 +97,6 @@ class CrashRecoveryManager(
         val metadataFile = File(sessionDir, "session_metadata.json")
 
         if (!metadataFile.exists()) {
-            // No metadata file - might be a partial session, mark as crashed
             createCrashedMetadata(sessionDir, "NO_METADATA")
             return SessionRecoveryResult(wasCrashed = true, reason = "No metadata file found")
         }
@@ -110,16 +108,13 @@ class CrashRecoveryManager(
 
             when (status) {
                 "STARTED" -> {
-                    // Session was started but never completed - mark as crashed
                     markSessionAsCrashed(metadataFile, json, "INTERRUPTED")
                     SessionRecoveryResult(wasCrashed = true, reason = "Session was interrupted")
                 }
                 "COMPLETED", "COMPLETED_WITH_ERRORS", "CRASHED" -> {
-                    // Session was properly finished - no recovery needed
                     SessionRecoveryResult(wasCrashed = false, reason = "Session was properly finished")
                 }
                 else -> {
-                    // Unknown status - mark as crashed to be safe
                     markSessionAsCrashed(metadataFile, json, "UNKNOWN_STATUS")
                     SessionRecoveryResult(wasCrashed = true, reason = "Unknown session status: $status")
                 }

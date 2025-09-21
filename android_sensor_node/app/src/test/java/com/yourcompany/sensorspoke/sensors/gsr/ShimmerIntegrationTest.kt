@@ -35,16 +35,12 @@ class ShimmerIntegrationTest {
     @Test
     fun testBasicRecordingLifecycle() =
         runBlocking {
-            // Start recording
             recorder.start(testSessionDir)
 
-            // Let simulation run briefly
             Thread.sleep(300)
 
-            // Stop recording
             recorder.stop()
 
-            // Verify CSV file was created
             val csvFile = File(testSessionDir, "gsr.csv")
             assertTrue("GSR CSV file should exist", csvFile.exists())
             assertTrue("CSV file should not be empty", csvFile.length() > 0)
@@ -54,7 +50,7 @@ class ShimmerIntegrationTest {
     fun testCSVFormatCompliance() =
         runBlocking {
             recorder.start(testSessionDir)
-            Thread.sleep(500) // Let more data accumulate for better test
+            Thread.sleep(500)
             recorder.stop()
 
             val csvFile = File(testSessionDir, "gsr.csv")
@@ -63,14 +59,12 @@ class ShimmerIntegrationTest {
             val lines = csvFile.readLines()
             assertTrue("CSV should have header", lines.isNotEmpty())
 
-            // Check header format - should include raw ADC for validation
             val header = lines[0]
             val expectedColumns = listOf("timestamp_ns", "gsr_microsiemens", "ppg_raw", "gsr_raw_adc")
             for (column in expectedColumns) {
                 assertTrue("Header should contain $column", header.contains(column))
             }
 
-            // Check data rows if any
             if (lines.size > 1) {
                 val dataRow = lines[1].split(",")
                 assertEquals(
@@ -79,19 +73,16 @@ class ShimmerIntegrationTest {
                     dataRow.size,
                 )
 
-                // Validate timestamp format (should be nanoseconds)
                 val timestamp = dataRow[0].toLong()
                 assertTrue(
                     "Timestamp should be reasonable nanosecond value",
                     timestamp > 1_000_000_000_000_000L,
-                ) // > year 2001 in ns
+                )
 
-                // Validate GSR value
                 val gsrValue = dataRow[1].toFloat()
                 assertTrue("GSR should be positive", gsrValue >= 0.0f)
                 assertTrue("GSR should be reasonable human range", gsrValue < 1000.0f)
 
-                // Validate PPG value
                 val ppgValue = dataRow[2].toIntOrNull()
                 if (ppgValue != null) {
                     assertTrue(
@@ -121,7 +112,7 @@ class ShimmerIntegrationTest {
             val lines = csvFile.readLines()
 
             var adcValueFound = false
-            for (i in 1 until lines.size) { // Skip header
+            for (i in 1 until lines.size) {
                 val data = lines[i].split(",")
                 if (data.size >= 4) {
                     val rawAdc = data[3].toInt()
@@ -133,7 +124,6 @@ class ShimmerIntegrationTest {
                         rawAdc >= 0 && rawAdc <= 4095,
                     )
 
-                    // Should NOT be using 16-bit values
                     assertFalse("Must NOT use 16-bit ADC values", rawAdc > 4095)
                 }
             }
@@ -158,15 +148,13 @@ class ShimmerIntegrationTest {
             assertTrue("$description - should be reasonable range", result < 100.0)
         }
 
-        // Test boundary conditions for 12-bit ADC
         val minResult = recorder.convertGsrToMicroSiemens(0)
         val maxResult = recorder.convertGsrToMicroSiemens(4095)
 
         assertTrue("Min ADC should give min GSR", minResult <= maxResult)
 
-        // Test that 16-bit values are properly clamped to 12-bit
-        val clampedResult = recorder.convertGsrToMicroSiemens(65535) // 16-bit value
-        val maxValidResult = recorder.convertGsrToMicroSiemens(4095) // 12-bit max
+        val clampedResult = recorder.convertGsrToMicroSiemens(65535)
+        val maxValidResult = recorder.convertGsrToMicroSiemens(4095)
 
         assertEquals(
             "16-bit values should be clamped to 12-bit max",
@@ -180,16 +168,16 @@ class ShimmerIntegrationTest {
     fun testSamplingRateCompliance() =
         runBlocking {
             recorder.start(testSessionDir)
-            Thread.sleep(1000) // Collect data for 1 second
+            Thread.sleep(1000)
             recorder.stop()
 
             val csvFile = File(testSessionDir, "gsr.csv")
             val lines = csvFile.readLines()
 
-            if (lines.size > 10) { // Need enough samples
+            if (lines.size > 10) {
                 val timestamps = mutableListOf<Long>()
 
-                for (i in 1 until lines.size) { // Skip header
+                for (i in 1 until lines.size) {
                     val data = lines[i].split(",")
                     if (data.isNotEmpty()) {
                         timestamps.add(data[0].toLong())
@@ -197,12 +185,10 @@ class ShimmerIntegrationTest {
                 }
 
                 if (timestamps.size >= 2) {
-                    // Calculate average sampling rate
                     val totalTimeNs = timestamps.last() - timestamps.first()
                     val totalTimeSec = totalTimeNs / 1e9
                     val actualRate = (timestamps.size - 1) / totalTimeSec
 
-                    // Should be approximately 128 Hz (within reasonable tolerance)
                     assertTrue(
                         "Sampling rate should be close to 128 Hz, got $actualRate",
                         actualRate >= 100.0 && actualRate <= 150.0,
@@ -216,13 +202,13 @@ class ShimmerIntegrationTest {
         runBlocking {
             // Test that simulation mode generates realistic GSR data
             recorder.start(testSessionDir)
-            Thread.sleep(600) // Longer collection for better analysis
+            Thread.sleep(600)
             recorder.stop()
 
             val csvFile = File(testSessionDir, "gsr.csv")
             val lines = csvFile.readLines()
 
-            if (lines.size > 20) { // Need sufficient data
+            if (lines.size > 20) {
                 val gsrValues = mutableListOf<Double>()
 
                 for (i in 1 until lines.size) {
@@ -235,17 +221,14 @@ class ShimmerIntegrationTest {
                 if (gsrValues.isNotEmpty()) {
                     val mean = gsrValues.average()
 
-                    // Should be in realistic human GSR range
                     assertTrue(
                         "Mean GSR should be realistic (5-50 µS)",
                         mean >= 5.0 && mean <= 50.0,
                     )
 
-                    // Should have some variation (not constant)
                     val variance = gsrValues.map { (it - mean) * (it - mean) }.average()
                     assertTrue("GSR should have physiological variation", variance > 0.1)
 
-                    // All values should be positive
                     assertTrue(
                         "All GSR values should be positive",
                         gsrValues.all { it >= 0.0 },
@@ -272,13 +255,11 @@ class ShimmerIntegrationTest {
                     if (ppgRaw != null && ppgRaw != 0) {
                         ppgValuesFound = true
 
-                        // PPG should be in reasonable 12-bit range
                         assertTrue(
                             "PPG should be in 12-bit range",
                             ppgRaw >= 0 && ppgRaw <= 4095,
                         )
 
-                        // Should be around mid-range for typical PPG
                         assertTrue(
                             "PPG should be reasonable physiological range",
                             ppgRaw >= 1000 && ppgRaw <= 3500,
@@ -293,17 +274,13 @@ class ShimmerIntegrationTest {
     @Test
     fun testBLEConnectionSimulation() =
         runBlocking {
-            // Test that BLE connection simulation handles lifecycle correctly
-            // This tests the path that would be taken when no real Shimmer hardware is present
 
             recorder.start(testSessionDir)
 
-            // Should not crash even without real BLE hardware
             Thread.sleep(200)
 
             recorder.stop()
 
-            // Should have fallen back to simulation and generated data
             val csvFile = File(testSessionDir, "gsr.csv")
             assertTrue("Should fall back to simulation gracefully", csvFile.exists())
         }
@@ -311,14 +288,12 @@ class ShimmerIntegrationTest {
     @Test
     fun testErrorHandling() =
         runBlocking {
-            // Test with invalid session directory
             val invalidDir = File("/invalid/path/that/does/not/exist")
 
             try {
                 recorder.start(invalidDir)
                 recorder.stop()
             } catch (e: Exception) {
-                // Should handle errors gracefully
                 assertTrue(
                     "Should be a reasonable exception type",
                     e is SecurityException || e is java.io.IOException,
@@ -329,14 +304,12 @@ class ShimmerIntegrationTest {
     @Test
     fun testConcurrentOperations() =
         runBlocking {
-            // Test multiple start/stop cycles
             repeat(3) {
                 recorder.start(testSessionDir)
                 Thread.sleep(100)
                 recorder.stop()
             }
 
-            // Should handle repeated operations without issues
             val csvFile = File(testSessionDir, "gsr.csv")
             assertTrue("Should handle multiple cycles", csvFile.exists())
         }
@@ -351,17 +324,16 @@ class ShimmerIntegrationTest {
             val csvFile = File(testSessionDir, "gsr.csv")
             val lines = csvFile.readLines()
 
-            if (lines.size > 3) { // Need multiple data points
+            if (lines.size > 3) {
                 val timestamps = mutableListOf<Long>()
 
-                for (i in 1 until lines.size) { // Skip header
+                for (i in 1 until lines.size) {
                     val data = lines[i].split(",")
                     if (data.isNotEmpty()) {
                         timestamps.add(data[0].toLong())
                     }
                 }
 
-                // Timestamps should be monotonically increasing
                 for (i in 1 until timestamps.size) {
                     assertTrue(
                         "Timestamps should be monotonically increasing",
@@ -381,13 +353,11 @@ class ShimmerIntegrationTest {
             val csvFile = File(testSessionDir, "gsr.csv")
             val lines = csvFile.readLines()
 
-            // Check that all data rows have valid values
-            for (i in 1 until lines.size) { // Skip header
+            for (i in 1 until lines.size) {
                 val data = lines[i].split(",")
 
                 assertTrue("Each row should have 4 columns", data.size == 4)
 
-                // Validate each field can be parsed correctly
                 val timestamp = data[0].toLong()
                 val gsrValue = data[1].toDouble()
                 val ppgValue = data[2].toIntOrNull()

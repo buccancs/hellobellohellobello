@@ -29,8 +29,7 @@ class PytestBridgeTest {
 
         val repoRoot =
             findRepoRoot(start) ?: run {
-                // Try common Gradle module relative locations as a fallback
-                val candidate1 = start.parentFile?.parentFile // from app module up to repo
+                val candidate1 = start.parentFile?.parentFile
                 val try1 = candidate1?.let { findRepoRoot(it) }
                 if (try1 != null) {
                     try1
@@ -53,7 +52,6 @@ class PytestBridgeTest {
                 .directory(repoRoot)
                 .redirectErrorStream(true)
 
-        // First check if pytest is available
         val checkCmd = arrayOf("python3", "-m", "pytest", "--version")
         val checkPb =
             ProcessBuilder(*checkCmd)

@@ -32,10 +32,8 @@ class RgbCameraRecorderTest {
             val context: Context = ApplicationProvider.getApplicationContext()
             val owner = TestOwner()
             val recorder = RgbCameraRecorder(context, owner)
-            // Should not throw
             recorder.stop()
             recorder.stop()
-            // No observable state to check; ensure we reached here
             assertThat(true).isTrue()
         }
 }

@@ -38,7 +38,6 @@ def test_fr4_session_management_end_to_end(tmp_path: Path) -> None:
     assert meta["state"] == "Recording"
     assert isinstance(meta.get("start_time_ns"), int)
 
-    # Stop and verify finalization
     sm.stop_recording()
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     assert meta["state"] == "Stopped"
@@ -63,7 +62,6 @@ def test_fr1_simulation_mode_generates_gsr_csv(tmp_path: Path) -> None:
 
     csv_path = sdir / "gsr.csv"
 
-    # Prepare a thread-safe writer and sample counter
     lock = threading.Lock()
     count = {"n": 0}
 
@@ -72,16 +70,14 @@ def test_fr1_simulation_mode_generates_gsr_csv(tmp_path: Path) -> None:
     writer.writerow(["timestamp_ns", "gsr_dummy"])
 
     def cb(ts_ns: int, value: float) -> None:
-        # Write in the callback under a lock to avoid interleaved writes
         with lock:
             writer.writerow([ts_ns, float(value)])
             count["n"] += 1
 
-    shimmer = SimulatedShimmer(sample_rate_hz=256)  # faster to keep test quick
+    shimmer = SimulatedShimmer(sample_rate_hz=256)
     assert shimmer.connect() is True
     shimmer.start_streaming(cb)
 
-    # Wait for enough samples (e.g., 25 at 256 Hz ~ 0.1 s) or timeout to avoid flakiness
     t0 = time.time()
     while True:
         with lock:
@@ -94,7 +90,6 @@ def test_fr1_simulation_mode_generates_gsr_csv(tmp_path: Path) -> None:
 
     shimmer.stop_streaming()
 
-    # Ensure data flushed
     f.flush()
     f.close()
 
@@ -102,5 +97,4 @@ def test_fr1_simulation_mode_generates_gsr_csv(tmp_path: Path) -> None:
 
     assert csv_path.exists(), "CSV should be created in the session directory"
     lines = csv_path.read_text(encoding="utf-8").strip().splitlines()
-    # header + >=1 data row
     assert len(lines) >= 2, f"Expected at least 2 lines (header + data), got {len(lines)}"

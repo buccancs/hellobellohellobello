@@ -63,11 +63,9 @@ class ShimmerBluetoothDialog : AppCompatActivity() {
                 // Could request to enable Bluetooth here
             }
 
-            // Get paired devices
             val paired = bluetoothAdapter.bondedDevices
             pairedDevices.clear()
 
-            // Filter for Shimmer devices
             for (device in paired) {
                 if (device.name?.contains("Shimmer", ignoreCase = true) == true ||
                     device.name?.contains("GSR", ignoreCase = true) == true
